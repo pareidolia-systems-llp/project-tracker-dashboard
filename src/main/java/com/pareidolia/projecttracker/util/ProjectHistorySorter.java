@@ -25,15 +25,30 @@ public class ProjectHistorySorter {
 
     }
 
-    private static YearMonth getYearMonth(Project project){
+    private static YearMonth getYearMonth(Project project) {
 
-        return YearMonth.parse(
-                project.getReportingMonth(),
-                FORMATTER
+        String reportingMonth = project.getReportingMonth()
+                .replace(",", "")
+                .trim();
+
+        DateTimeFormatter[] formatters = {
+                DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH),
+                DateTimeFormatter.ofPattern("MMM yyyy", Locale.ENGLISH),
+                DateTimeFormatter.ofPattern("MMMMyyyy", Locale.ENGLISH),
+                DateTimeFormatter.ofPattern("MMMyyyy", Locale.ENGLISH)
+        };
+
+        for (DateTimeFormatter formatter : formatters) {
+            try {
+                return YearMonth.parse(reportingMonth, formatter);
+            } catch (Exception ignored) {
+            }
+        }
+
+        throw new RuntimeException(
+                "Unsupported reporting month format: " + reportingMonth
         );
-
     }
-
     private static Integer getWeekStart(Project project){
 
         String week = project.getWeekOf();
