@@ -128,20 +128,72 @@ public class DashboardCalculationServiceImpl
 
         int total = 0;
 
+        System.out.println();
+        System.out.println("========== ISSUE PTD CALCULATION ==========");
+        System.out.println(
+                "Selected Month = " + currentProject.getReportingMonth()
+                        + " | Selected Week = " + currentProject.getWeekOf()
+        );
+
         for (Project project : history) {
 
-            total += value(
-                    project.getIssueCases()
+            String weekOf = project.getWeekOf();
+            int issue = value(project.getIssueCases());
+
+            System.out.println(
+                    "CHECKING ISSUE -> "
+                            + "Month=[" + project.getReportingMonth() + "]"
+                            + " | Week=[" + weekOf + "]"
+                            + " | Issue=[" + issue + "]"
             );
 
+            /*
+             * Issue PTD is calculated only from actual weekly rows.
+             *
+             * A blank Week Of represents a project/month-level value
+             * and must not be treated as a new weekly issue count.
+             */
+            if (weekOf == null || weekOf.trim().isEmpty()) {
+
+                System.out.println(
+                        "SKIPPED ISSUE -> Blank Week Of"
+                                + " | Issue=" + issue
+                );
+
+                continue;
+            }
+
+            if (issue > 0) {
+
+                total += issue;
+
+                System.out.println(
+                        "ADDING ISSUE -> "
+                                + "Month=[" + project.getReportingMonth() + "]"
+                                + " | Week=[" + weekOf + "]"
+                                + " | Issue=" + issue
+                                + " | Running PTD=" + total
+                );
+            }
+
             if (sameWeek(project, currentProject)) {
+
+                System.out.println(
+                        "SELECTED WEEK REACHED -> stopping calculation"
+                );
+
                 break;
             }
         }
 
+        System.out.println(
+                "========== FINAL ISSUE PTD = "
+                        + total
+                        + " =========="
+        );
+
         return total;
     }
-
     /**
      * Calculates Assigned PTD.
      *
