@@ -21,15 +21,7 @@ public class HistoryServiceImpl
     public List<Project> getWeeklyHistory(String projectName) {
 
         List<Project> history = new ArrayList<>(
-
                 projectRepository.findByProjectName(projectName)
-                        .stream()
-                        .filter(project ->
-                                project.getWeekOf() != null
-                                        &&
-                                        !project.getWeekOf().isBlank())
-                        .toList()
-
         );
 
         ProjectHistorySorter.sort(history);

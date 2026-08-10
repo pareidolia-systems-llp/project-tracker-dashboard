@@ -62,6 +62,19 @@ public class ProjectServiceImpl implements ProjectService {
      */
     private boolean synchronizeProject(GoogleSheetRowDto dto) {
 
+        if ("Pilot Coronary CTA".equals(dto.getProjectName())
+                && "February, 2026".equals(dto.getReportingMonth())) {
+
+            System.out.println(
+                    "Project = " + dto.getProjectName()
+                            + " | Week = [" + dto.getWeekOf() + "]"
+                            + " | Assigned = " + dto.getAssignedToPareidolia()
+                            + " | Submitted = " + dto.getAnnotationsSubmittedPareidolia()
+                            + " | Issue = " + dto.getIssueCases()
+                            + " | Assigned Date = " + dto.getAssignedDate()
+            );
+        }
+
         if (!isValidProject(dto)) {
             return false;
         }
@@ -137,10 +150,28 @@ public class ProjectServiceImpl implements ProjectService {
 
     }
 
+
+
     /**
      * Saves project into database.
      */
     private void saveProject(Project project) {
+
+        System.out.println(
+                "Saving -> "
+                        + project.getReportingMonth()
+                        + " | "
+                        + project.getProjectName()
+                        + " | Week=[" + project.getWeekOf() + "]"
+                        + " | Assigned="
+                        + project.getAssignedToPareidolia()
+                        + " | Submitted="
+                        + project.getAnnotationsSubmittedPareidolia()
+                        + " | Issue="
+                        + project.getIssueCases()
+                        + " | Assigned Date="
+                        + project.getAssignedDate()
+        );
 
         projectRepository.save(project);
 

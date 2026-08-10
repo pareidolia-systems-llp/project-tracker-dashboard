@@ -1,14 +1,13 @@
 package com.pareidolia.projecttracker.service.impl;
 
 import com.google.api.services.sheets.v4.Sheets;
+import com.google.api.services.sheets.v4.model.Sheet;
+import com.google.api.services.sheets.v4.model.Spreadsheet;
 import com.google.api.services.sheets.v4.model.ValueRange;
 import com.pareidolia.projecttracker.dto.google.GoogleSheetRowDto;
 import com.pareidolia.projecttracker.mapper.ColumnIndexMapper;
 import com.pareidolia.projecttracker.mapper.GoogleSheetRowMapper;
 import com.pareidolia.projecttracker.service.GoogleSheetsService;
-import static com.pareidolia.projecttracker.constants.SheetColumns.*;
-import com.google.api.services.sheets.v4.model.Spreadsheet;
-import com.google.api.services.sheets.v4.model.Sheet;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +18,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import static com.pareidolia.projecttracker.constants.SheetColumns.*;
+
 @Service
 public class GoogleSheetsServiceImpl implements GoogleSheetsService {
 
@@ -28,6 +29,7 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
 
     @Value("${google.sheet.id}")
     private String spreadsheetId;
+
     public GoogleSheetsServiceImpl(
             Sheets sheets,
             GoogleSheetRowMapper mapper,
@@ -53,30 +55,32 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
 
         return allRows;
     }
+
     private void validateHeaders(
             Map<String, Integer> columnIndexMap) {
 
         List<String> requiredHeaders = List.of(
-
                 PROJECT_NAME,
                 PROJECT_TYPE,
                 PRIORITY,
                 VENDOR,
                 WEEK_OF
-
         );
 
         for (String header : requiredHeaders) {
+
             if (!columnIndexMap.containsKey(normalize(header))) {
 
                 throw new IllegalStateException(
                         "Required column '" + header +
-                                "' is missing from the Google Sheet.");
+                                "' is missing from the Google Sheet."
+                );
             }
         }
     }
 
-    private List<String> getMonthlySheetNames() throws IOException {
+    private List<String> getMonthlySheetNames()
+            throws IOException {
 
         Spreadsheet spreadsheet = sheets.spreadsheets()
                 .get(spreadsheetId)
@@ -86,11 +90,12 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
 
         for (Sheet sheet : spreadsheet.getSheets()) {
 
-            String sheetName = sheet.getProperties().getTitle();
+            String sheetName =
+                    sheet.getProperties().getTitle();
 
-
-            System.out.println("Found Sheet : " + sheetName);
-
+            System.out.println(
+                    "Found Sheet : " + sheetName
+            );
 
             // Ignore non-reporting sheets
             if (!sheetName.matches(".*\\d{4}$")) {
@@ -103,18 +108,20 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
         return monthlySheets;
     }
 
-    private List<GoogleSheetRowDto> processSheet(String sheetName)
+    private List<GoogleSheetRowDto> processSheet(
+            String sheetName)
             throws IOException {
 
-//        String sheetRange = "'" + sheetName + "'!A:Z";
-        String sheetRange = "'" + sheetName + "'!A2:Z";
+        String sheetRange =
+                "'" + sheetName + "'!A2:Z";
 
         ValueRange response = sheets.spreadsheets()
                 .values()
                 .get(spreadsheetId, sheetRange)
                 .execute();
 
-        List<List<Object>> rows = response.getValues();
+        List<List<Object>> rows =
+                response.getValues();
 
         if (rows == null || rows.isEmpty()) {
             return Collections.emptyList();
@@ -123,23 +130,36 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
         List<Object> headerRow = rows.get(0);
 
         System.out.println("--------------------------------");
-        System.out.println("Sheet : " + sheetName);
-        System.out.println("Header Row : " + headerRow);
+        System.out.println(
+                "Sheet : " + sheetName
+        );
+        System.out.println(
+                "Header Row : " + headerRow
+        );
         System.out.println("--------------------------------");
 
-
         Map<String, Integer> columnIndexMap =
-                columnIndexMapper.buildColumnIndexMap(headerRow);
+                columnIndexMapper.buildColumnIndexMap(
+                        headerRow
+                );
 
         System.out.println("Headers:");
-        columnIndexMap.keySet().forEach(System.out::println);
 
-
+        columnIndexMap.keySet()
+                .forEach(System.out::println);
 
         validateHeaders(columnIndexMap);
 
-        List<GoogleSheetRowDto> dtoList = new ArrayList<>();
+        List<GoogleSheetRowDto> dtoList =
+                new ArrayList<>();
 
+        /*
+         * These variables remember the values from the
+         * most recent project header.
+         *
+         * Google Sheets often leaves these cells blank
+         * for the following weekly rows.
+         */
         String lastProjectName = null;
         String lastProjectType = null;
         String lastPriority = null;
@@ -153,63 +173,171 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                 continue;
             }
 
+            /*
+             * STEP 1
+             *
+             * Map the raw Google Sheet row into DTO.
+             */
             GoogleSheetRowDto dto =
-                    mapper.mapRow(row, columnIndexMap);
+                    mapper.mapRow(
+                            row,
+                            columnIndexMap
+                    );
 
-            // Set reporting month from sheet name
+            /*
+             * STEP 2
+             *
+             * Reporting month comes directly from
+             * the sheet/tab name.
+             */
             dto.setReportingMonth(sheetName);
 
-            // Carry forward Project Name
-            if (dto.getProjectName() != null &&
-                    !dto.getProjectName().isBlank()) {
+            /*
+             * STEP 3
+             *
+             * Determine the current project BEFORE
+             * checking whether the row is a spacer.
+             *
+             * This is important because the project name
+             * changes at the beginning of a new project
+             * block.
+             */
 
-                lastProjectName = dto.getProjectName();
+            // Project Name
+            if (dto.getProjectName() != null
+                    && !dto.getProjectName().isBlank()) {
 
-            } else {
-
-                dto.setProjectName(lastProjectName);
-            }
-
-            // Carry forward Project Type
-            if (dto.getProjectType() != null &&
-                    !dto.getProjectType().isBlank()) {
-
-                lastProjectType = dto.getProjectType();
-
-            } else {
-
-                dto.setProjectType(lastProjectType);
-            }
-
-            // Carry forward Priority
-            if (dto.getPriority() != null &&
-                    !dto.getPriority().isBlank()) {
-
-                lastPriority = dto.getPriority();
+                lastProjectName =
+                        dto.getProjectName().trim();
 
             } else {
 
-                dto.setPriority(lastPriority);
+                dto.setProjectName(
+                        lastProjectName
+                );
             }
 
-            // Carry forward Total Data Requested By AML
-            if (dto.getTotalDataRequestedByAml() != null &&
-                    !dto.getTotalDataRequestedByAml().isBlank()) {
+            // Project Type
+            if (dto.getProjectType() != null
+                    && !dto.getProjectType().isBlank()) {
+
+                lastProjectType =
+                        dto.getProjectType().trim();
+
+            } else {
+
+                dto.setProjectType(
+                        lastProjectType
+                );
+            }
+
+            // Priority
+            if (dto.getPriority() != null
+                    && !dto.getPriority().isBlank()) {
+
+                lastPriority =
+                        dto.getPriority().trim();
+
+            } else {
+
+                dto.setPriority(
+                        lastPriority
+                );
+            }
+
+            // Total Data Requested By AML
+            if (dto.getTotalDataRequestedByAml() != null
+                    && !dto.getTotalDataRequestedByAml().isBlank()) {
 
                 lastTotalDataRequestedByAml =
-                        dto.getTotalDataRequestedByAml();
+                        dto.getTotalDataRequestedByAml().trim();
 
             } else {
 
                 dto.setTotalDataRequestedByAml(
-                        lastTotalDataRequestedByAml);
+                        lastTotalDataRequestedByAml
+                );
             }
 
+            /*
+             * STEP 4
+             *
+             * NOW check whether this is a spacer row.
+             *
+             * We deliberately do this AFTER project
+             * identification.
+             */
+            if (isSpacerRow(dto)) {
+
+                continue;
+            }
+
+            /*
+             * STEP 5
+             *
+             * Debug information.
+             */
+            System.out.println(
+                    "### RAW CHECK ###"
+                            + " | Sheet=[" + sheetName + "]"
+                            + " | Project=[" + dto.getProjectName() + "]"
+                            + " | Week=[" + dto.getWeekOf() + "]"
+                            + " | Assigned=[" + dto.getAssignedToPareidolia() + "]"
+                            + " | AssignedDate=[" + dto.getAssignedDate() + "]"
+                            + " | Submitted=[" + dto.getAnnotationsSubmittedPareidolia() + "]"
+                            + " | Issue=[" + dto.getIssueCases() + "]"
+            );
+
+            System.out.println(
+                    "DTO -> "
+                            + sheetName
+                            + " | Project="
+                            + dto.getProjectName()
+                            + " | Week=["
+                            + dto.getWeekOf()
+                            + "]"
+                            + " | Assigned="
+                            + dto.getAssignedToPareidolia()
+                            + " | Submitted="
+                            + dto.getAnnotationsSubmittedPareidolia()
+                            + " | Issue="
+                            + dto.getIssueCases()
+                            + " | Assigned Date="
+                            + dto.getAssignedDate()
+            );
+
+            /*
+             * STEP 6
+             *
+             * Special November debugging for Pilot Coronary CTA.
+             */
+            if ("November 2025".equals(sheetName)
+                    && "Pilot Coronary CTA".equals(
+                    dto.getProjectName())) {
+
+                System.out.println(
+                        "========== NOVEMBER PILOT DTO =========="
+                                + "\nSheet = [" + sheetName + "]"
+                                + "\nProject = [" + dto.getProjectName() + "]"
+                                + "\nWeek = [" + dto.getWeekOf() + "]"
+                                + "\nAssigned = [" + dto.getAssignedToPareidolia() + "]"
+                                + "\nAssigned Date = [" + dto.getAssignedDate() + "]"
+                                + "\nSubmitted = [" + dto.getAnnotationsSubmittedPareidolia() + "]"
+                                + "\nIssue = [" + dto.getIssueCases() + "]"
+                );
+            }
+
+            /*
+             * STEP 7
+             *
+             * Add the completed DTO to the list.
+             */
             dtoList.add(dto);
         }
 
         return dtoList;
     }
+
     private String normalize(String header) {
 
         return header == null
@@ -219,5 +347,14 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                 .replaceAll("\\s+", " ")
                 .trim()
                 .toLowerCase();
+    }
+
+    private boolean isSpacerRow(
+            GoogleSheetRowDto dto) {
+
+        return dto.getWeekOf().isBlank()
+                && dto.getAssignedToPareidolia().isBlank()
+                && dto.getAnnotationsSubmittedPareidolia().isBlank()
+                && dto.getIssueCases().isBlank();
     }
 }

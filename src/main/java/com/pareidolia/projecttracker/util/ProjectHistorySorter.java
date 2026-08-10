@@ -49,13 +49,23 @@ public class ProjectHistorySorter {
                 "Unsupported reporting month format: " + reportingMonth
         );
     }
-    private static Integer getWeekStart(Project project){
+    private static Integer getWeekStart(Project project) {
 
         String week = project.getWeekOf();
 
-        return Integer.parseInt(
-                week.split("-")[0]
-        );
+        if (week == null || week.trim().isEmpty()) {
+            return Integer.MAX_VALUE;
+        }
+
+        try {
+            return Integer.parseInt(
+                    week.trim().split("-")[0]
+            );
+        } catch (NumberFormatException ex) {
+
+            return Integer.MAX_VALUE;
+
+        }
 
     }
 
