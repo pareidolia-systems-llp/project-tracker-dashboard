@@ -121,10 +121,10 @@ public class ProjectServiceImpl implements ProjectService {
     private Project getOrCreateProject(GoogleSheetRowDto dto) {
 
         return projectRepository
-                .findByProjectNameAndReportingMonthAndWeekOf(
+                .findByProjectNameAndReportingMonthAndReportingPeriod(
                         dto.getProjectName(),
                         dto.getReportingMonth(),
-                        dto.getWeekOf())
+                        dto.getReportingPeriod())
                 .orElse(new Project());
 
     }

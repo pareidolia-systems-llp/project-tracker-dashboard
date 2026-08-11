@@ -72,6 +72,8 @@ public class ProjectMapper {
         project.setWeekOf(dto.getWeekOf());
         project.setAssignedDate(dto.getAssignedDate());
 
+        project.setReportingPeriod(dto.getReportingPeriod());
+
         project.setCurrentStatus(dto.getNotes());
 
         project.setReportingMonth(dto.getReportingMonth());

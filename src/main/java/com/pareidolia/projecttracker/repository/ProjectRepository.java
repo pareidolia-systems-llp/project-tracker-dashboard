@@ -16,7 +16,7 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
 //        Save new projects.
 //Update existing ones.
 
-    Optional<Project> findByProjectNameAndReportingMonthAndWeekOf(
+    Optional<Project> findByProjectNameAndReportingMonthAndReportingPeriod(
             String projectName,
             String reportingMonth,
             String weekOf);

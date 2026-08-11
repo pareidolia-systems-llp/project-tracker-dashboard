@@ -85,6 +85,11 @@ public class GoogleSheetRowDto {
 
     private String pendingAnnotations;
 
+
+    private Integer sourceRowNumber;
+
+    private Integer reportingPeriod;
+
     /* ==========================
        Remarks
        ========================== */
