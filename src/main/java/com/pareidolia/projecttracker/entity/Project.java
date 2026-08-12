@@ -103,11 +103,11 @@ public class Project {
     @Column(name = "reporting_month", nullable = false, length = 20)
     private String reportingMonth;
 
-    @Column(name = "source_row_number", nullable = false)
-    private Integer sourceRowNumber;
+
 
     private String assignedDate;
-    @Column(name = "reporting_month", nullable = false, length = 20)
+
+    @Column(name = "reporting_period")
     private Integer reportingPeriod;
 
     /* ==========================
@@ -117,4 +117,6 @@ public class Project {
     private String currentStatus;
 
     private String projectHealth;
+
+
 }

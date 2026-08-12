@@ -19,7 +19,7 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     Optional<Project> findByProjectNameAndReportingMonthAndReportingPeriod(
             String projectName,
             String reportingMonth,
-            String weekOf);
+            Integer reportingPeriod);
 
     List<Project> findByProjectName(String projectName);
 

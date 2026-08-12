@@ -1,0 +1,19 @@
+$kind: http-request
+name: Calculate-ptd
+description: ""
+url: http://localhost:8080/api/dashboard/ptd?projectName=Pilot%20Coronary%20CTA&reportingMonth=Apr,%202026&weekOf=20-30
+method: GET
+queryParams:
+  - key: projectName
+    value: Pilot%20Coronary%20CTA
+    disabled: false
+    description: ""
+  - key: reportingMonth
+    value: Apr,%202026
+    disabled: false
+    description: ""
+  - key: weekOf
+    value: 20-30
+    disabled: false
+    description: ""
+order: 3198689094658205

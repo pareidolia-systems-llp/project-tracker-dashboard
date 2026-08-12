@@ -78,6 +78,7 @@ public class ProjectMapper {
 
         project.setReportingMonth(dto.getReportingMonth());
 
+
         System.out.println(
                 "DTO Month = " + dto.getReportingMonth() +
                         " | Project = " + dto.getProjectName()

@@ -165,6 +165,8 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
         String lastPriority = null;
         String lastTotalDataRequestedByAml = null;
 
+        int reportingPeriod = 0;
+
         for (int i = 1; i < rows.size(); i++) {
 
             List<Object> row = rows.get(i);
@@ -183,6 +185,21 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                             row,
                             columnIndexMap
                     );
+
+            if (dto.getProjectName() != null
+                    && dto.getProjectName().contains("Neuro3D")) {
+
+                System.out.println(
+                        "========== NEURO3D FOUND ==========" +
+                                "\nSheet = [" + sheetName + "]" +
+                                "\nRaw Row Index = [" + i + "]" +
+                                "\nProject = [" + dto.getProjectName() + "]" +
+                                "\nWeek = [" + dto.getWeekOf() + "]" +
+                                "\nAssigned = [" + dto.getAssignedToPareidolia() + "]" +
+                                "\nSubmitted = [" + dto.getAnnotationsSubmittedPareidolia() + "]" +
+                                "\nIssue = [" + dto.getIssueCases() + "]"
+                );
+            }
 
             /*
              * STEP 2
@@ -204,19 +221,59 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
              */
 
             // Project Name
+            // Project Name
             if (dto.getProjectName() != null
                     && !dto.getProjectName().isBlank()) {
 
-                lastProjectName =
-                        dto.getProjectName().trim();
+                // New project block
+                lastProjectName = dto.getProjectName().trim();
+
+                // Restart reporting period for the new project
+                reportingPeriod = 0;
 
             } else {
 
-                dto.setProjectName(
-                        lastProjectName
-                );
-            }
+                /*
+                 * Blank project name.
+                 *
+                 * Normally this is a continuation of the current project.
+                 * However, if the previous project has already completed
+                 * all 4 reporting periods and this row has no Week Of,
+                 * this can be a project-level row belonging to the
+                 * NEXT project.
+                 */
 
+                boolean projectLevelRowBeforeNextProject =
+                        reportingPeriod >= 4
+                                && dto.getWeekOf() != null
+                                && dto.getWeekOf().isBlank()
+                                && hasProjectLevelData(dto);
+
+                if (projectLevelRowBeforeNextProject) {
+
+                    String nextProjectName =
+                            findNextProjectName(rows, i, columnIndexMap);
+
+                    if (nextProjectName != null) {
+
+                        dto.setProjectName(nextProjectName);
+
+                        // This is a project-level row, not Week 1.
+                        reportingPeriod = 0;
+
+                        lastProjectName = nextProjectName;
+
+                    } else {
+
+                        dto.setProjectName(lastProjectName);
+                    }
+
+                } else {
+
+                    // Normal continuation row
+                    dto.setProjectName(lastProjectName);
+                }
+            }
             // Project Type
             if (dto.getProjectType() != null
                     && !dto.getProjectType().isBlank()) {
@@ -271,9 +328,65 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
 
                 continue;
             }
+            /*
+             * Determine the business reporting period.
+             *
+             * A project can have a maximum of 4 reporting periods:
+             *
+             * 1 = 01-07
+             * 2 = 08-14
+             * 3 = 15-21
+             * 4 = 22-last day
+             *
+             * If we already processed 4 periods and encounter
+             * another data-bearing row with a blank Week Of,
+             * treat it as a project-level row rather than
+             * creating Period 5.
+             */
+
+            if (reportingPeriod >= 4
+                    && dto.getWeekOf() != null
+                    && dto.getWeekOf().isBlank()) {
+
+                dto.setReportingPeriod(0);
+
+                System.out.println(
+                        "PROJECT LEVEL ROW -> "
+                                + "Sheet=[" + sheetName + "]"
+                                + " | Project=[" + dto.getProjectName() + "]"
+                                + " | Week=[]"
+                                + " | Issue=[" + dto.getIssueCases() + "]"
+                                + " | Submitted=["
+                                + dto.getAnnotationsSubmittedPareidolia()
+                                + "]"
+                );
+
+            } else {
+
+                reportingPeriod++;
+
+                if (reportingPeriod > 4) {
+
+                    System.out.println(
+                            "WARNING -> More than 4 reporting rows found"
+                                    + " | Project=[" + dto.getProjectName() + "]"
+                                    + " | Sheet=[" + sheetName + "]"
+                                    + " | Week=[" + dto.getWeekOf() + "]"
+                    );
+
+                    /*
+                     * Do not create Period 5.
+                     *
+                     * Skip this unexpected row for now.
+                     */
+                    continue;
+                }
+
+                dto.setReportingPeriod(reportingPeriod);
+            }
 
             /*
-             * STEP 5
+             * STEP 6
              *
              * Debug information.
              */
@@ -286,6 +399,7 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                             + " | AssignedDate=[" + dto.getAssignedDate() + "]"
                             + " | Submitted=[" + dto.getAnnotationsSubmittedPareidolia() + "]"
                             + " | Issue=[" + dto.getIssueCases() + "]"
+                            + " | ReportingPeriod=[" + dto.getReportingPeriod() + "]"
             );
 
             System.out.println(
@@ -307,7 +421,7 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
             );
 
             /*
-             * STEP 6
+             * STEP 7
              *
              * Special November debugging for Pilot Coronary CTA.
              */
@@ -328,7 +442,7 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
             }
 
             /*
-             * STEP 7
+             * STEP 8
              *
              * Add the completed DTO to the list.
              */
@@ -356,5 +470,53 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                 && dto.getAssignedToPareidolia().isBlank()
                 && dto.getAnnotationsSubmittedPareidolia().isBlank()
                 && dto.getIssueCases().isBlank();
+    }
+
+    private boolean hasProjectLevelData(GoogleSheetRowDto dto) {
+
+        return hasValue(dto.getIssueCases())
+                || hasValue(dto.getAnnotationsSubmittedPareidolia())
+                || hasValue(dto.getAssignedToPareidolia())
+                || hasValue(dto.getAnnotationPendingFromPareidolia())
+                || hasValue(dto.getReviewsPendingFromPareidolia())
+                || hasValue(dto.getPendingRapidAiReview())
+                || hasValue(dto.getCasesMovedToLabels());
+    }
+    private boolean hasValue(String value) {
+
+        return value != null && !value.isBlank();
+    }
+    private String findNextProjectName(
+            List<List<Object>> rows,
+            int currentIndex,
+            Map<String, Integer> columnIndexMap) {
+
+        for (int i = currentIndex + 1; i < rows.size(); i++) {
+
+            List<Object> nextRow = rows.get(i);
+
+            if (nextRow == null || nextRow.isEmpty()) {
+                continue;
+            }
+
+            GoogleSheetRowDto nextDto =
+                    mapper.mapRow(
+                            nextRow,
+                            columnIndexMap
+                    );
+
+
+
+            String nextProjectName =
+                    nextDto.getProjectName();
+
+            if (nextProjectName != null
+                    && !nextProjectName.isBlank()) {
+
+                return nextProjectName.trim();
+            }
+        }
+
+        return null;
     }
 }
