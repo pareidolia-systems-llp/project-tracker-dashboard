@@ -2,11 +2,9 @@ package com.pareidolia.projecttracker.controller;
 
 import com.pareidolia.projecttracker.dto.dashboard.DashboardPtdResponseDto;
 import com.pareidolia.projecttracker.service.dashboard.DashboardCalculationService;
+import com.pareidolia.projecttracker.service.dashboard.DashboardKpiPopulationService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/dashboard")
@@ -14,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class DashboardController {
 
     private final DashboardCalculationService dashboardCalculationService;
-
+    private final DashboardKpiPopulationService dashboardKpiPopulationService;
     @GetMapping("/ptd")
     public DashboardPtdResponseDto getProjectPtd(
 
@@ -29,5 +27,15 @@ public class DashboardController {
                 reportingMonth,
                 weekOf
         );
+    }
+
+    @PostMapping("/kpi/populate")
+    public String populateDashboardKpis() {
+
+        int processed =
+                dashboardKpiPopulationService.populateExistingKpis();
+
+        return "Dashboard KPI population completed. Processed: "
+                + processed;
     }
 }

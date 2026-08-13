@@ -4,6 +4,7 @@ import com.pareidolia.projecttracker.dto.dashboard.DashboardPtdResponseDto;
 import com.pareidolia.projecttracker.entity.Project;
 import com.pareidolia.projecttracker.service.dashboard.DashboardCalculationService;
 import com.pareidolia.projecttracker.service.dashboard.HistoryService;
+import com.pareidolia.projecttracker.service.dashboard.DashboardKpiService;
 import com.pareidolia.projecttracker.service.dashboard.MonthlyProjectSummaryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,7 @@ public class DashboardCalculationServiceImpl
         implements DashboardCalculationService {
 
     private final HistoryService historyService;
+    private final DashboardKpiService dashboardKpiService;
 
     private final MonthlyProjectSummaryService monthlyProjectSummaryService;
 
@@ -37,37 +39,43 @@ public class DashboardCalculationServiceImpl
         );
 
         // Calculate PTD
-        return DashboardPtdResponseDto.builder()
+        DashboardPtdResponseDto response =
+                DashboardPtdResponseDto.builder()
 
-                .projectName(currentProject.getProjectName())
+                        .projectName(currentProject.getProjectName())
 
-                .assignedWeekly(
-                        value(currentProject.getAssignedToPareidolia()))
+                        .assignedWeekly(
+                                value(currentProject.getAssignedToPareidolia()))
 
-                .assignedPtd(
-                        calculateAssignedPtd(
-                                weeklyHistory,
-                                currentProject))
+                        .assignedPtd(
+                                calculateAssignedPtd(
+                                        weeklyHistory,
+                                        currentProject))
 
-                .submittedWeekly(
-                        value(
-                                currentProject
-                                        .getAnnotationsSubmittedPareidolia()))
+                        .submittedWeekly(
+                                value(
+                                        currentProject
+                                                .getAnnotationsSubmittedPareidolia()))
 
-                .submittedPtd(
-                        calculateSubmittedPtd(
-                                weeklyHistory,
-                                currentProject))
+                        .submittedPtd(
+                                calculateSubmittedPtd(
+                                        weeklyHistory,
+                                        currentProject))
 
-                .issueWeekly(
-                        value(currentProject.getIssueCases()))
+                        .issueWeekly(
+                                value(currentProject.getIssueCases()))
 
-                .issuePtd(
-                        calculateIssuePtd(
-                                weeklyHistory,
-                                currentProject))
+                        .issuePtd(
+                                calculateIssuePtd(
+                                        weeklyHistory,
+                                        currentProject))
 
-                .build();
+                        .build();
+
+        dashboardKpiService.savePtdKpi(currentProject, response);
+
+        return response;
+
     }
 
     /**
