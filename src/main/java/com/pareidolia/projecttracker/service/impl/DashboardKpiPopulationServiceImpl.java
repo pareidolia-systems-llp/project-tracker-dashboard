@@ -19,46 +19,59 @@ public class DashboardKpiPopulationServiceImpl
     private final ProjectRepository projectRepository;
     private final DashboardCalculationService dashboardCalculationService;
 
+
     @Override
     public int populateExistingKpis() {
 
         List<Project> projects = projectRepository.findAll();
 
         int processed = 0;
-        int skipped = 0;
+        int failed = 0;
 
         for (Project project : projects) {
 
-            // Do not attempt the existing PTD calculation
-            // when Week Of is blank.
-            // Blank Week Of rows are legitimate Period 1-4 data
-            // and will be handled separately.
-            if (project.getWeekOf() == null
-                    || project.getWeekOf().trim().isEmpty()) {
-
-                skipped++;
-
-                log.info(
-                        "Skipping blank Week Of -> Project='{}' | Month='{}' | Period={}",
-                        project.getProjectName(),
-                        project.getReportingMonth(),
-                        project.getReportingPeriod()
-                );
-
-                continue;
-            }
-
             try {
 
-                dashboardCalculationService.calculateProjectPtd(
-                        project.getProjectName(),
-                        project.getReportingMonth(),
-                        project.getWeekOf()
-                );
+                /*
+                 * Normal case:
+                 * Week Of is available, so use the existing
+                 * senior-verified week-based PTD calculation.
+                 */
+                if (project.getWeekOf() != null
+                        && !project.getWeekOf().trim().isEmpty()) {
+
+                    dashboardCalculationService.calculateProjectPtd(
+                            project.getProjectName(),
+                            project.getReportingMonth(),
+                            project.getWeekOf()
+                    );
+
+                }
+
+                /*
+                 * Special case:
+                 * Senior forgot to enter Week Of.
+                 *
+                 * The row is still legitimate because it belongs
+                 * to a reporting period and contains actual values.
+                 *
+                 * Therefore calculate PTD using:
+                 * Project + Reporting Month + Reporting Period
+                 */
+                else {
+
+                    dashboardCalculationService.calculateProjectPtdByPeriod(
+                            project.getProjectName(),
+                            project.getReportingMonth(),
+                            project.getReportingPeriod()
+                    );
+                }
 
                 processed++;
 
             } catch (Exception ex) {
+
+                failed++;
 
                 log.error(
                         "Failed KPI calculation -> Project='{}' | Month='{}' | Period={} | Week='{}'",
@@ -72,9 +85,9 @@ public class DashboardKpiPopulationServiceImpl
         }
 
         log.info(
-                "Dashboard KPI population completed. Processed={}, SkippedBlankWeek={}",
+                "Dashboard KPI population completed. Processed={}, Failed={}",
                 processed,
-                skipped
+                failed
         );
 
         return processed;

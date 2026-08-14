@@ -4,6 +4,7 @@ import com.pareidolia.projecttracker.entity.Project;
 
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -32,16 +33,35 @@ public class ProjectHistorySorter {
                 .trim();
 
         DateTimeFormatter[] formatters = {
-                DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH),
-                DateTimeFormatter.ofPattern("MMM yyyy", Locale.ENGLISH),
-                DateTimeFormatter.ofPattern("MMMMyyyy", Locale.ENGLISH),
-                DateTimeFormatter.ofPattern("MMMyyyy", Locale.ENGLISH)
+
+                new DateTimeFormatterBuilder()
+                        .parseCaseInsensitive()
+                        .appendPattern("MMMM yyyy")
+                        .toFormatter(Locale.ENGLISH),
+
+                new DateTimeFormatterBuilder()
+                        .parseCaseInsensitive()
+                        .appendPattern("MMM yyyy")
+                        .toFormatter(Locale.ENGLISH),
+
+                new DateTimeFormatterBuilder()
+                        .parseCaseInsensitive()
+                        .appendPattern("MMMMyyyy")
+                        .toFormatter(Locale.ENGLISH),
+
+                new DateTimeFormatterBuilder()
+                        .parseCaseInsensitive()
+                        .appendPattern("MMMyyyy")
+                        .toFormatter(Locale.ENGLISH)
         };
 
         for (DateTimeFormatter formatter : formatters) {
+
             try {
                 return YearMonth.parse(reportingMonth, formatter);
+
             } catch (Exception ignored) {
+                // Try the next format
             }
         }
 

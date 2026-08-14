@@ -6,6 +6,7 @@ import com.pareidolia.projecttracker.service.dashboard.DashboardCalculationServi
 import com.pareidolia.projecttracker.service.dashboard.HistoryService;
 import com.pareidolia.projecttracker.service.dashboard.DashboardKpiService;
 import com.pareidolia.projecttracker.service.dashboard.MonthlyProjectSummaryService;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -119,6 +120,68 @@ public class DashboardCalculationServiceImpl
             );
 
             if (sameWeek(project, currentProject)) {
+                break;
+            }
+        }
+
+        return total;
+    }
+
+    private int calculateSubmittedPtdByPeriod(
+            List<Project> history,
+            Project currentProject) {
+
+        int total = 0;
+
+        for (Project project : history) {
+
+            total += value(
+                    project.getAnnotationsSubmittedPareidolia()
+            );
+
+            if (samePeriod(project, currentProject)) {
+                break;
+            }
+        }
+
+        return total;
+    }
+
+    private int calculateIssuePtdByPeriod(
+            List<Project> history,
+            Project currentProject) {
+
+        int total = 0;
+
+        for (Project project : history) {
+
+            String weekOf = project.getWeekOf();
+            int issue = value(project.getIssueCases());
+
+            /*
+             * Preserve the existing business rule:
+             * blank Week Of rows are not treated as weekly Issue Cases.
+             */
+            if (weekOf == null || weekOf.trim().isEmpty()) {
+
+                /*
+                 * IMPORTANT:
+                 * Even though the issue value is skipped,
+                 * this may still be the selected Period.
+                 *
+                 * Therefore we must stop AFTER identifying the
+                 * selected period.
+                 */
+                if (samePeriod(project, currentProject)) {
+                    break;
+                }
+
+                continue;
+            }
+
+            total += issue;
+
+            if (samePeriod(project, currentProject)) {
                 break;
             }
         }
@@ -344,6 +407,8 @@ public class DashboardCalculationServiceImpl
                 continue;
             }
 
+
+
             /*
              * ---------------------------------------------------------
              * PURE PREVIOUS CASES
@@ -472,6 +537,78 @@ public class DashboardCalculationServiceImpl
                         + assignedPtd
                         + " =========="
         );
+
+        return assignedPtd;
+    }
+
+    private int calculateAssignedPtdByPeriod(
+            List<Project> history,
+            Project currentProject) {
+
+        int assignedPtd = 0;
+
+        for (int i = 0; i < history.size(); i++) {
+
+            Project project = history.get(i);
+
+            int assigned =
+                    value(project.getAssignedToPareidolia());
+
+            String assignedDate =
+                    project.getAssignedDate();
+
+            boolean previousCases =
+                    isPreviousCases(assignedDate);
+
+            /*
+             * No assignment on this row.
+             */
+            if (assigned <= 0) {
+
+                if (samePeriod(project, currentProject)) {
+                    break;
+                }
+
+                continue;
+            }
+
+            /*
+             * Previous Cases row
+             */
+            if (previousCases) {
+
+                int previousMonthCarryForward =
+                        findPreviousMonthCarryForward(
+                                history,
+                                i
+                        );
+
+                int freshAssignment =
+                        assigned - previousMonthCarryForward;
+
+                /*
+                 * Never allow a negative fresh assignment.
+                 */
+                freshAssignment =
+                        Math.max(freshAssignment, 0);
+
+                assignedPtd += freshAssignment;
+
+            } else {
+
+                /*
+                 * Normal fresh assignment
+                 */
+                assignedPtd += assigned;
+            }
+
+            /*
+             * Stop at the selected reporting period.
+             */
+            if (samePeriod(project, currentProject)) {
+                break;
+            }
+        }
 
         return assignedPtd;
     }
@@ -672,6 +809,17 @@ public class DashboardCalculationServiceImpl
         return number == null ? 0 : number;
     }
 
+    private boolean samePeriod(
+            Project project,
+            Project currentProject) {
+
+        return project.getReportingMonth().equals(
+                currentProject.getReportingMonth())
+                &&
+                project.getReportingPeriod().equals(
+                        currentProject.getReportingPeriod());
+    }
+
     private boolean isPreviousCases(
             String assignedDate) {
 
@@ -684,4 +832,94 @@ public class DashboardCalculationServiceImpl
                 .toLowerCase()
                 .startsWith("previous cases");
     }
+
+
+    @Override
+    @Transactional
+    public DashboardPtdResponseDto calculateProjectPtdByPeriod(
+            String projectName,
+            String reportingMonth,
+            Integer reportingPeriod) {
+
+        List<Project> history =
+                historyService.getWeeklyHistory(projectName);
+
+        Project currentProject = getCurrentPeriod(
+                history,
+                reportingMonth,
+                reportingPeriod
+        );
+
+        DashboardPtdResponseDto response =
+                DashboardPtdResponseDto.builder()
+
+                        .projectName(currentProject.getProjectName())
+
+                        /*
+                         * For a blank Week Of row, these values are still
+                         * legitimate source values from the Projects table.
+                         */
+                        .assignedWeekly(
+                                value(currentProject.getAssignedToPareidolia()))
+
+                        .assignedPtd(
+                                calculateAssignedPtdByPeriod(
+                                        history,
+                                        currentProject))
+
+                        .submittedWeekly(
+                                value(
+                                        currentProject
+                                                .getAnnotationsSubmittedPareidolia()))
+
+                        .submittedPtd(
+                                calculateSubmittedPtdByPeriod(
+                                        history,
+                                        currentProject))
+
+                        .issueWeekly(
+                                value(currentProject.getIssueCases()))
+
+                        .issuePtd(
+                                calculateIssuePtdByPeriod(
+                                        history,
+                                        currentProject))
+
+                        .build();
+
+        /*
+         * This is important:
+         * save the result against the actual Project row,
+         * even when Week Of is blank.
+         */
+        dashboardKpiService.savePtdKpi(
+                currentProject,
+                response
+        );
+
+        return response;
+    }
+
+    private Project getCurrentPeriod(
+            List<Project> history,
+            String reportingMonth,
+            Integer reportingPeriod) {
+
+        return history.stream()
+                .filter(project ->
+                        reportingMonth.equals(project.getReportingMonth())
+                                &&
+                                reportingPeriod.equals(project.getReportingPeriod())
+                )
+                .findFirst()
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Project period not found: "
+                                        + reportingMonth
+                                        + " / Period "
+                                        + reportingPeriod
+                        )
+                );
+    }
+
 }

@@ -29,6 +29,22 @@ public class DashboardController {
         );
     }
 
+    @GetMapping("/ptd/period")
+    public DashboardPtdResponseDto getProjectPtdByPeriod(
+
+            @RequestParam String projectName,
+
+            @RequestParam String reportingMonth,
+
+            @RequestParam Integer reportingPeriod) {
+
+        return dashboardCalculationService.calculateProjectPtdByPeriod(
+                projectName,
+                reportingMonth,
+                reportingPeriod
+        );
+    }
+
     @PostMapping("/kpi/populate")
     public String populateDashboardKpis() {
 
