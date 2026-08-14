@@ -1,0 +1,9 @@
+$kind: http-request
+name: Populate KPI -POST CHECK
+description: ""
+url: http://localhost:8080/api/dashboard/kpi/populate
+method: POST
+body:
+  type: json
+  content: ""
+order: 3286426984950222

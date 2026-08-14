@@ -1,0 +1,10 @@
+$kind: http-request
+name: PTD-CHECK
+description: ""
+url: http://localhost:8080/api/dashboard/ptd/period?projectName=Pilot%20Coronary%20CTA&reportingMonth=Feb%202026&reportingPeriod=4
+method: GET
+queryParams:
+  projectName: Pilot%20Coronary%20CTA
+  reportingMonth: Feb%202026
+  reportingPeriod: "4"
+order: 3905100061196424
