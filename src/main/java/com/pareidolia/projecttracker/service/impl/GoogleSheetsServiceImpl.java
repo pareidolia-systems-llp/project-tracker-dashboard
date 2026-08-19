@@ -143,6 +143,42 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                         headerRow
                 );
 
+        System.out.println(
+                "### RAW Y HEADER ### "
+                        + " | Index=24"
+                        + " | Value=["
+                        + (headerRow.size() > 24
+                        ? headerRow.get(24)
+                        : "COLUMN NOT FOUND")
+                        + "]"
+        );
+
+        if ("Feb 2026".equals(sheetName)) {
+
+            System.out.println(
+                    "### FEB 2026 HEADER DEBUG ###"
+                            + " | W(22)=["
+                            + (headerRow.size() > 22
+                            ? headerRow.get(22)
+                            : "NOT FOUND")
+                            + "]"
+                            + " | X(23)=["
+                            + (headerRow.size() > 23
+                            ? headerRow.get(23)
+                            : "NOT FOUND")
+                            + "]"
+                            + " | Y(24)=["
+                            + (headerRow.size() > 24
+                            ? headerRow.get(24)
+                            : "NOT FOUND")
+                            + "]"
+                            + " | Z(25)=["
+                            + (headerRow.size() > 25
+                            ? headerRow.get(25)
+                            : "NOT FOUND")
+                            + "]"
+            );
+        }
         System.out.println("Headers:");
 
         columnIndexMap.keySet()
@@ -170,6 +206,29 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
         for (int i = 1; i < rows.size(); i++) {
 
             List<Object> row = rows.get(i);
+
+            if ("Feb 2026".equals(sheetName)) {
+
+                System.out.println(
+                        "### FEB 2026 DATA Y ###"
+                                + " | RowSize=[" + row.size() + "]"
+                                + " | Project=["
+                                + (row.size() > 1 ? row.get(1) : "N/A")
+                                + "]"
+                                + " | W(22)=["
+                                + (row.size() > 22 ? row.get(22) : "NOT PRESENT")
+                                + "]"
+                                + " | X(23)=["
+                                + (row.size() > 23 ? row.get(23) : "NOT PRESENT")
+                                + "]"
+                                + " | Y(24)=["
+                                + (row.size() > 24 ? row.get(24) : "NOT PRESENT")
+                                + "]"
+                                + " | Z(25)=["
+                                + (row.size() > 25 ? row.get(25) : "NOT PRESENT")
+                                + "]"
+                );
+            }
 
             if (row.isEmpty()) {
                 continue;
@@ -391,13 +450,15 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
              * Debug information.
              */
             System.out.println(
-                    "### RAW CHECK ###"
+                    "### ACCEPTED REJECTED TEST ###"
                             + " | Sheet=[" + sheetName + "]"
                             + " | Project=[" + dto.getProjectName() + "]"
                             + " | Week=[" + dto.getWeekOf() + "]"
                             + " | Assigned=[" + dto.getAssignedToPareidolia() + "]"
                             + " | AssignedDate=[" + dto.getAssignedDate() + "]"
                             + " | Submitted=[" + dto.getAnnotationsSubmittedPareidolia() + "]"
+                            + " | Rejected(W)=[" + dto.getCasesMovedToLabels() + "]"
+                            + " | Accepted(Y)=[" + dto.getAnnotationsCompleted() + "]"
                             + " | Issue=[" + dto.getIssueCases() + "]"
                             + " | ReportingPeriod=[" + dto.getReportingPeriod() + "]"
             );
@@ -469,6 +530,8 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
         return dto.getWeekOf().isBlank()
                 && dto.getAssignedToPareidolia().isBlank()
                 && dto.getAnnotationsSubmittedPareidolia().isBlank()
+                && dto.getCasesMovedToLabels().isBlank()
+                && dto.getAnnotationsCompleted().isBlank()
                 && dto.getIssueCases().isBlank();
     }
 
@@ -480,7 +543,8 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                 || hasValue(dto.getAnnotationPendingFromPareidolia())
                 || hasValue(dto.getReviewsPendingFromPareidolia())
                 || hasValue(dto.getPendingRapidAiReview())
-                || hasValue(dto.getCasesMovedToLabels());
+                || hasValue(dto.getCasesMovedToLabels())
+                ||hasValue(dto.getAnnotationsCompleted());
     }
     private boolean hasValue(String value) {
 

@@ -39,6 +39,28 @@ public class DashboardCalculationServiceImpl
                 weekOf
         );
 
+
+        int acceptedPtd =
+                calculateAcceptedPtd(weeklyHistory, currentProject);
+
+        int rejectedWeekly =
+                value(currentProject.getCasesMovedToLabels());
+
+        int rejectedPtd =
+                calculateRejectedPtd(
+                        weeklyHistory,
+                        currentProject);
+
+        double acceptedPtdPercentage =
+                calculateAcceptedPtdPercentage(
+                        acceptedPtd,
+                        rejectedPtd);
+
+        double rejectedPtdPercentage =
+                calculateRejectedPtdPercentage(
+                        acceptedPtd,
+                        rejectedPtd);
+
         // Calculate PTD
         DashboardPtdResponseDto response =
                 DashboardPtdResponseDto.builder()
@@ -70,6 +92,16 @@ public class DashboardCalculationServiceImpl
                                 calculateIssuePtd(
                                         weeklyHistory,
                                         currentProject))
+
+                        .acceptedPtd(acceptedPtd)
+
+                        .rejectedWeekly(rejectedWeekly)
+
+                        .rejectedPtd(rejectedPtd)
+
+                        .acceptedPtdPercentage(acceptedPtdPercentage)
+
+                        .rejectedPtdPercentage(rejectedPtdPercentage)
 
                         .build();
 
@@ -850,6 +882,26 @@ public class DashboardCalculationServiceImpl
                 reportingPeriod
         );
 
+        int acceptedPtd =
+                calculateAcceptedPtd(history, currentProject);
+        int rejectedWeekly =
+                value(currentProject.getCasesMovedToLabels());
+
+        int rejectedPtd =
+                calculateRejectedPtdByPeriod(
+                        history,
+                        currentProject);
+
+        double acceptedPtdPercentage =
+                calculateAcceptedPtdPercentage(
+                        acceptedPtd,
+                        rejectedPtd);
+
+        double rejectedPtdPercentage =
+                calculateRejectedPtdPercentage(
+                        acceptedPtd,
+                        rejectedPtd);
+
         DashboardPtdResponseDto response =
                 DashboardPtdResponseDto.builder()
 
@@ -884,6 +936,16 @@ public class DashboardCalculationServiceImpl
                                 calculateIssuePtdByPeriod(
                                         history,
                                         currentProject))
+
+                        .acceptedPtd(acceptedPtd)
+
+                        .rejectedWeekly(rejectedWeekly)
+
+                        .rejectedPtd(rejectedPtd)
+
+                        .acceptedPtdPercentage(acceptedPtdPercentage)
+
+                        .rejectedPtdPercentage(rejectedPtdPercentage)
 
                         .build();
 
@@ -922,4 +984,94 @@ public class DashboardCalculationServiceImpl
                 );
     }
 
+    private int calculateAcceptedPtd(
+            List<Project> history,
+            Project currentProject) {
+
+        String reportingMonth = currentProject.getReportingMonth();
+
+        for (Project project : history) {
+
+            if (!reportingMonth.equals(project.getReportingMonth())) {
+                continue;
+            }
+
+            int acceptedPtd =
+                    value(project.getAnnotationsCompleted());
+
+
+            if (acceptedPtd > 0) {
+                return acceptedPtd;
+            }
+        }
+
+        return 0;
+    }
+    private int calculateRejectedPtd(
+            List<Project> history,
+            Project currentProject) {
+
+        int total = 0;
+
+        for (Project project : history) {
+
+            total += value(
+                    project.getCasesMovedToLabels());
+
+            if (sameWeek(project, currentProject)) {
+                break;
+            }
+        }
+
+        return total;
+    }
+
+    //W → casesMovedToLabels → Rejected PTD
+    //Y → annotationsCompleted → Accepted PTD
+
+
+    private double calculateAcceptedPtdPercentage(
+            int acceptedPtd,
+            int rejectedPtd) {
+
+        int total = acceptedPtd + rejectedPtd;
+
+        if (total == 0) {
+            return 0.0;
+        }
+
+        return (acceptedPtd * 100.0) / total;
+    }
+
+    private double calculateRejectedPtdPercentage(
+            int acceptedPtd,
+            int rejectedPtd) {
+
+        int total = acceptedPtd + rejectedPtd;
+
+        if (total == 0) {
+            return 0.0;
+        }
+
+        return (rejectedPtd * 100.0) / total;
+    }
+
+    private int calculateRejectedPtdByPeriod(
+            List<Project> history,
+            Project currentProject) {
+
+        int total = 0;
+
+        for (Project project : history) {
+
+            total += value(
+                    project.getCasesMovedToLabels());
+
+            if (samePeriod(project, currentProject)) {
+                break;
+            }
+        }
+
+        return total;
+    }
 }

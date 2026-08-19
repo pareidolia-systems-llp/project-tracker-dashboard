@@ -53,4 +53,21 @@ public class DashboardKpi {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "accepted_ptd")
+    private Integer acceptedPtd;
+
+    @Column(name = "rejected_weekly")
+    private Integer rejectedWeekly;
+
+
+    @Column(name = "rejected_ptd")
+    private Integer rejectedPtd;
+
+    @Column(name = "accepted_ptd_percentage")
+    private Double acceptedPtdPercentage;
+
+    @Column(name = "rejected_ptd_percentage")
+    private Double rejectedPtdPercentage;
+
 }

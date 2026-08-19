@@ -17,4 +17,12 @@ public class DashboardPtdResponseDto {
 
     private Integer issueWeekly;
     private Integer issuePtd;
+
+    private Integer acceptedPtd;
+
+    private Integer rejectedWeekly;
+    private Integer rejectedPtd;
+
+    private Double acceptedPtdPercentage;
+    private Double rejectedPtdPercentage;
 }

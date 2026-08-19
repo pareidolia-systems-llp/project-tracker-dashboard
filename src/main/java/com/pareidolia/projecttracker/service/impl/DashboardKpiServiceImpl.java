@@ -45,6 +45,16 @@ public class DashboardKpiServiceImpl implements DashboardKpiService {
         kpi.setIssueWeekly(response.getIssueWeekly());
         kpi.setIssuePtd(response.getIssuePtd());
 
+        kpi.setAcceptedPtd(response.getAcceptedPtd());
+
+        kpi.setRejectedWeekly(response.getRejectedWeekly());
+        kpi.setRejectedPtd(response.getRejectedPtd());
+
+
+
+        kpi.setAcceptedPtdPercentage(response.getAcceptedPtdPercentage());
+        kpi.setRejectedPtdPercentage(response.getRejectedPtdPercentage());
+
         if (kpi.getCreatedAt() == null) {
             kpi.setCreatedAt(LocalDateTime.now());
         }

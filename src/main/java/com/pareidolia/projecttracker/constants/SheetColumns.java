@@ -30,7 +30,8 @@ public final class SheetColumns {
     public static final String ISSUE_CASES = "Issue Cases";
     public static final String CASES_MOVED_TO_LABELS = "Cases Moved to Labels";
     public static final String ETD = "ETD";
-    public static final String ANNOTATIONS_COMPLETED = "Annotations Completed";
+    public static final String ANNOTATIONS_COMPLETED =
+            "Annotations Completed (GT+Rapid Review)";
     public static final String PENDING_ANNOTATIONS = "Pending Annotations";
     public static final String NOTES = "Notes";
 }
