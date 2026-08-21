@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDate;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -89,6 +91,8 @@ public class GoogleSheetRowDto {
     private Integer sourceRowNumber;
 
     private Integer reportingPeriod;
+
+    private LocalDate reportingMonthDate;
 
     /* ==========================
        Remarks

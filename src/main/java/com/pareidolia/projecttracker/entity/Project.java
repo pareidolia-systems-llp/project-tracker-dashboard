@@ -3,6 +3,8 @@ package com.pareidolia.projecttracker.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
+
 @Entity
 @Table(name = "projects",uniqueConstraints = {
 @UniqueConstraint(
@@ -103,7 +105,8 @@ public class Project {
     @Column(name = "reporting_month", nullable = false, length = 20)
     private String reportingMonth;
 
-
+    @Column(name = "reporting_month_date")
+    private LocalDate reportingMonthDate;
 
     private String assignedDate;
 

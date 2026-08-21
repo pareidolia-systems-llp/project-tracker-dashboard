@@ -4,16 +4,14 @@ import com.pareidolia.projecttracker.dto.google.GoogleSheetRowDto;
 import com.pareidolia.projecttracker.entity.Project;
 import org.springframework.stereotype.Component;
 
-
 @Component
 public class ProjectMapper {
+
     public Project toEntity(GoogleSheetRowDto dto) {
 
         Project project = new Project();
 
         updateEntity(project, dto);
-
-
 
         return project;
     }
@@ -25,62 +23,112 @@ public class ProjectMapper {
         project.setPriority(dto.getPriority());
         project.setVendor(dto.getVendor());
 
+        /* ==========================
+           Reporting Month
+           ========================== */
+
         project.setReportingMonth(dto.getReportingMonth());
+        project.setReportingMonthDate(dto.getReportingMonthDate());
+
+        /* ==========================
+           Dataset Information
+           ========================== */
 
         project.setTotalDataRequestedByAml(dto.getTotalDataRequestedByAml());
         project.setDataRequested(dto.getDataRequested());
         project.setDataReceived(dto.getDataReceived());
 
-        project.setNumberOfCasesReceived(parseInteger(dto.getNumberOfCasesReceived()));
+        project.setNumberOfCasesReceived(
+                parseInteger(dto.getNumberOfCasesReceived())
+        );
 
-        project.setCasesInGroundTruth(parseInteger(dto.getCasesInGroundTruth()));
-        project.setOngoingRedbrickUploads(parseInteger(dto.getOngoingRedbrickUploads()));
-        project.setAssignedToPareidolia(parseInteger(dto.getAssignedToPareidolia()));
+        /* ==========================
+           Workflow Information
+           ========================== */
 
-        project.setReportingMonth(dto.getReportingMonth());
+        project.setCasesInGroundTruth(
+                parseInteger(dto.getCasesInGroundTruth())
+        );
+
+        project.setOngoingRedbrickUploads(
+                parseInteger(dto.getOngoingRedbrickUploads())
+        );
+
+        project.setAssignedToPareidolia(
+                parseInteger(dto.getAssignedToPareidolia())
+        );
 
         project.setAnnotationPendingFromPareidolia(
-                parseInteger(dto.getAnnotationPendingFromPareidolia()));
+                parseInteger(dto.getAnnotationPendingFromPareidolia())
+        );
+
         project.setReviewsPendingFromPareidolia(
-                parseInteger(dto.getReviewsPendingFromPareidolia()));
+                parseInteger(dto.getReviewsPendingFromPareidolia())
+        );
+
         project.setPendingRapidAiReview(
-                parseInteger(dto.getPendingRapidAiReview()));
+                parseInteger(dto.getPendingRapidAiReview())
+        );
+
         project.setRapidReviewWeeklyAssigned(
-                parseInteger(dto.getRapidReviewWeeklyAssigned()));
+                parseInteger(dto.getRapidReviewWeeklyAssigned())
+        );
 
         project.setAnnotationsSubmittedPareidolia(
-                parseInteger(dto.getAnnotationsSubmittedPareidolia()));
+                parseInteger(dto.getAnnotationsSubmittedPareidolia())
+        );
+
         project.setTotalAnnotationsSubmitted(
-                parseInteger(dto.getTotalAnnotationsSubmitted()));
+                parseInteger(dto.getTotalAnnotationsSubmitted())
+        );
+
+        /* ==========================
+           Quality Information
+           ========================== */
 
         project.setCasesNotAnnotatedDueToQuality(
-                parseInteger(dto.getCasesNotAnnotatedDueToQuality()));
+                parseInteger(dto.getCasesNotAnnotatedDueToQuality())
+        );
+
         project.setIssueCases(
-                parseInteger(dto.getIssueCases()));
+                parseInteger(dto.getIssueCases())
+        );
+
+        /* ==========================
+           Delivery Information
+           ========================== */
 
         project.setCasesMovedToLabels(
-                parseInteger(dto.getCasesMovedToLabels()));
+                parseInteger(dto.getCasesMovedToLabels())
+        );
 
         project.setEtd(dto.getEtd());
 
         project.setAnnotationsCompleted(
-                parseInteger(dto.getAnnotationsCompleted()));
+                parseInteger(dto.getAnnotationsCompleted())
+        );
 
         project.setPendingAnnotations(
-                parseInteger(dto.getPendingAnnotations()));
+                parseInteger(dto.getPendingAnnotations())
+        );
+
+        /* ==========================
+           Reporting Information
+           ========================== */
 
         project.setWeekOf(dto.getWeekOf());
         project.setAssignedDate(dto.getAssignedDate());
-
         project.setReportingPeriod(dto.getReportingPeriod());
+
+        /* ==========================
+           Status Information
+           ========================== */
 
         project.setCurrentStatus(dto.getNotes());
 
-        project.setReportingMonth(dto.getReportingMonth());
-
-
         System.out.println(
                 "DTO Month = " + dto.getReportingMonth() +
+                        " | Month Date = " + dto.getReportingMonthDate() +
                         " | Project = " + dto.getProjectName()
         );
 

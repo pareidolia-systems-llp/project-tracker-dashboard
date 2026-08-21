@@ -3,6 +3,7 @@ package com.pareidolia.projecttracker.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -26,6 +27,10 @@ public class DashboardKpi {
 
     @Column(name = "reporting_period", nullable = false)
     private Integer reportingPeriod;
+
+
+    @Column(name = "reporting_month_date")
+    private LocalDate reportingMonthDate;
 
     @Column(name = "week_of")
     private String weekOf;

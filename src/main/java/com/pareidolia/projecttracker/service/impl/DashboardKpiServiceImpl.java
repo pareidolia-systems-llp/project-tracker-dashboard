@@ -33,7 +33,9 @@ public class DashboardKpiServiceImpl implements DashboardKpiService {
 
         kpi.setProjectName(project.getProjectName());
         kpi.setReportingMonth(project.getReportingMonth());
+        kpi.setReportingMonthDate(project.getReportingMonthDate());
         kpi.setReportingPeriod(project.getReportingPeriod());
+
         kpi.setWeekOf(project.getWeekOf());
 
         kpi.setAssignedWeekly(response.getAssignedWeekly());

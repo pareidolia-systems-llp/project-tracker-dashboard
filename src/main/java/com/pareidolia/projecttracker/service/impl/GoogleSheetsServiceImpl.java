@@ -10,11 +10,13 @@ import com.pareidolia.projecttracker.mapper.GoogleSheetRowMapper;
 import com.pareidolia.projecttracker.service.GoogleSheetsService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import com.pareidolia.projecttracker.util.ReportingMonthUtil;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Collections;
+
 import java.util.List;
 import java.util.Map;
 
@@ -26,6 +28,7 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
     private final Sheets sheets;
     private final GoogleSheetRowMapper mapper;
     private final ColumnIndexMapper columnIndexMapper;
+
 
     @Value("${google.sheet.id}")
     private String spreadsheetId;
@@ -267,6 +270,9 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
              * the sheet/tab name.
              */
             dto.setReportingMonth(sheetName);
+            dto.setReportingMonthDate(
+                    ReportingMonthUtil.parse(sheetName)
+            );
 
             /*
              * STEP 3
