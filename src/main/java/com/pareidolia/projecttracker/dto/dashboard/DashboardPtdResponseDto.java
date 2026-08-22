@@ -18,6 +18,9 @@ public class DashboardPtdResponseDto {
     private Integer issueWeekly;
     private Integer issuePtd;
 
+    private Integer freshCases;
+    private Integer carryForwardedCases;
+
     private Integer acceptedPtd;
 
     private Integer rejectedWeekly;
@@ -25,4 +28,7 @@ public class DashboardPtdResponseDto {
 
     private Double acceptedPtdPercentage;
     private Double rejectedPtdPercentage;
+
+
+
 }

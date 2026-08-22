@@ -39,6 +39,10 @@ public class DashboardKpiServiceImpl implements DashboardKpiService {
         kpi.setWeekOf(project.getWeekOf());
 
         kpi.setAssignedWeekly(response.getAssignedWeekly());
+
+        kpi.setFreshCases(response.getFreshCases());
+        kpi.setCarryForwardedCases(response.getCarryForwardedCases());
+
         kpi.setAssignedPtd(response.getAssignedPtd());
 
         kpi.setSubmittedWeekly(response.getSubmittedWeekly());

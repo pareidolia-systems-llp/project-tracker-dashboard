@@ -53,6 +53,12 @@ public class DashboardKpi {
     @Column(name = "issue_ptd")
     private Integer issuePtd;
 
+    @Column(name = "fresh_cases")
+    private Integer freshCases;
+
+    @Column(name = "carry_forwarded_cases")
+    private Integer carryForwardedCases;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -74,5 +80,7 @@ public class DashboardKpi {
 
     @Column(name = "rejected_ptd_percentage")
     private Double rejectedPtdPercentage;
+
+
 
 }

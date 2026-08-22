@@ -39,6 +39,16 @@ public class DashboardCalculationServiceImpl
                 weekOf
         );
 
+        int freshCases =
+                calculateFreshCases(
+                        weeklyHistory,
+                        currentProject
+                );
+
+        int carryForwardedCases =
+                value(currentProject.getAssignedToPareidolia())
+                        - freshCases;
+
 
         int acceptedPtd =
                 calculateAcceptedPtd(weeklyHistory, currentProject);
@@ -67,8 +77,11 @@ public class DashboardCalculationServiceImpl
 
                         .projectName(currentProject.getProjectName())
 
-                        .assignedWeekly(
-                                value(currentProject.getAssignedToPareidolia()))
+                        .assignedWeekly(freshCases)
+
+                        .freshCases(freshCases)
+
+                        .carryForwardedCases(carryForwardedCases)
 
                         .assignedPtd(
                                 calculateAssignedPtd(
@@ -104,6 +117,7 @@ public class DashboardCalculationServiceImpl
                         .rejectedPtdPercentage(rejectedPtdPercentage)
 
                         .build();
+
 
         dashboardKpiService.savePtdKpi(currentProject, response);
 
@@ -882,6 +896,16 @@ public class DashboardCalculationServiceImpl
                 reportingPeriod
         );
 
+        int freshCases =
+                calculateFreshCases(
+                        history,
+                        currentProject
+                );
+
+        int carryForwardedCases =
+                value(currentProject.getAssignedToPareidolia())
+                        - freshCases;
+
         int acceptedPtd =
                 calculateAcceptedPtd(history, currentProject);
         int rejectedWeekly =
@@ -911,8 +935,11 @@ public class DashboardCalculationServiceImpl
                          * For a blank Week Of row, these values are still
                          * legitimate source values from the Projects table.
                          */
-                        .assignedWeekly(
-                                value(currentProject.getAssignedToPareidolia()))
+                        .assignedWeekly(freshCases)
+
+                        .freshCases(freshCases)
+
+                        .carryForwardedCases(carryForwardedCases)
 
                         .assignedPtd(
                                 calculateAssignedPtdByPeriod(
@@ -1073,5 +1100,49 @@ public class DashboardCalculationServiceImpl
         }
 
         return total;
+    }
+
+    private int calculateFreshCases(
+            List<Project> history,
+            Project currentProject) {
+
+        int assigned =
+                value(currentProject.getAssignedToPareidolia());
+
+        if (assigned <= 0) {
+            return 0;
+        }
+
+        String assignedDate =
+                currentProject.getAssignedDate();
+
+        boolean previousCases =
+                isPreviousCases(assignedDate);
+
+        /*
+         * Normal assignment:
+         * Entire value is fresh.
+         */
+        if (!previousCases) {
+            return assigned;
+        }
+
+        /*
+         * Previous Cases or
+         * Previous Cases + fresh assignment.
+         */
+        int currentIndex =
+                history.indexOf(currentProject);
+
+        int previousMonthCarryForward =
+                findPreviousMonthCarryForward(
+                        history,
+                        currentIndex
+                );
+
+        return Math.max(
+                assigned - previousMonthCarryForward,
+                0
+        );
     }
 }
