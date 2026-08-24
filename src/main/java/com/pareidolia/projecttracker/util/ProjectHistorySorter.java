@@ -18,9 +18,8 @@ public class ProjectHistorySorter {
 
         projects.sort(
                 Comparator
-
                         .comparing(ProjectHistorySorter::getYearMonth)
-
+                        .thenComparing(ProjectHistorySorter::getReportingPeriod)
                         .thenComparing(ProjectHistorySorter::getWeekStart)
         );
 
@@ -87,6 +86,14 @@ public class ProjectHistorySorter {
 
         }
 
+    }
+    private static Integer getReportingPeriod(Project project) {
+
+        Integer period = project.getReportingPeriod();
+
+        return period == null
+                ? Integer.MAX_VALUE
+                : period;
     }
 
 }

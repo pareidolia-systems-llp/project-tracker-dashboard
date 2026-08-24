@@ -248,6 +248,31 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                             columnIndexMap
                     );
 
+            dto.setSourceRowNumber(i + 2);
+
+            if (dto.getProjectName().isBlank()
+                    && hasProjectLevelData(dto)) {
+
+                String nextProjectName =
+                        findNextProjectName(rows, i, columnIndexMap);
+
+                System.out.println(
+                        "\n========== BOUNDARY CHECK =========="
+                                + "\nSheet            = [" + sheetName + "]"
+                                + "\nSource Row       = [" + dto.getSourceRowNumber() + "]"
+                                + "\nSerial Number    = [" + dto.getSerialNumber() + "]"
+                                + "\nRaw Project      = [" + dto.getProjectName() + "]"
+                                + "\nPrevious Project = [" + lastProjectName + "]"
+                                + "\nNext Project     = [" + nextProjectName + "]"
+                                + "\nWeek Of          = [" + dto.getWeekOf() + "]"
+                                + "\nAssigned Date    = [" + dto.getAssignedDate() + "]"
+                                + "\nAssigned         = [" + dto.getAssignedToPareidolia() + "]"
+                                + "\nSubmitted        = [" + dto.getAnnotationsSubmittedPareidolia() + "]"
+                                + "\nIssue            = [" + dto.getIssueCases() + "]"
+                                + "\n====================================\n"
+                );
+            }
+
             if (dto.getProjectName() != null
                     && dto.getProjectName().contains("Neuro3D")) {
 
@@ -286,71 +311,95 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
              */
 
             // Project Name
+
+            boolean preProjectRow = false;
+            // Project Name
+
             // Project Name
             if (dto.getProjectName() != null
                     && !dto.getProjectName().isBlank()) {
 
-                // New project block
+                // Explicit project name = start/current project block
                 lastProjectName = dto.getProjectName().trim();
 
-                // Restart reporting period for the new project
+                // New project starts again from period 0
                 reportingPeriod = 0;
 
             } else {
 
-                /*
-                 * Blank project name.
-                 *
-                 * Normally this is a continuation of the current project.
-                 * However, if the previous project has already completed
-                 * all 4 reporting periods and this row has no Week Of,
-                 * this can be a project-level row belonging to the
-                 * NEXT project.
-                 */
+                boolean blankWeek =
+                        dto.getWeekOf() == null
+                                || dto.getWeekOf().isBlank();
 
                 boolean projectLevelRowBeforeNextProject =
-                        reportingPeriod >= 4
-                                && dto.getWeekOf() != null
-                                && dto.getWeekOf().isBlank()
-                                && hasProjectLevelData(dto);
+                        blankWeek
+                                && hasProjectLevelData(dto)
+                                && isImmediatelyBeforeNextProject(
+                                rows,
+                                i,
+                                columnIndexMap
+                        );
 
                 if (projectLevelRowBeforeNextProject) {
 
                     String nextProjectName =
-                            findNextProjectName(rows, i, columnIndexMap);
+                            findNextProjectName(
+                                    rows,
+                                    i,
+                                    columnIndexMap
+                            );
 
-                    if (nextProjectName != null) {
+                    if (nextProjectName == null) {
 
-                        dto.setProjectName(nextProjectName);
-
-                        // This is a project-level row, not Week 1.
-                        reportingPeriod = 0;
-
-                        lastProjectName = nextProjectName;
-
-                    } else {
-
-                        dto.setProjectName(lastProjectName);
+                        throw new IllegalStateException(
+                                "Unable to determine project for boundary row"
+                                        + " | Sheet=[" + sheetName + "]"
+                                        + " | Row=[" + dto.getSourceRowNumber() + "]"
+                        );
                     }
+
+                    dto.setProjectName(nextProjectName);
+
+                    /*
+                     * This row belongs to the project that starts
+                     * immediately below it.
+                     */
+                    lastProjectName = nextProjectName;
+
+                    /*
+                     * Important:
+                     * This is NOT Week 1.
+                     */
+                    reportingPeriod = 0;
+                    preProjectRow = true;
+
+                    System.out.println(
+                            "PRE-PROJECT ROW RESOLVED"
+                                    + " | Sheet=[" + sheetName + "]"
+                                    + " | Row=[" + dto.getSourceRowNumber() + "]"
+                                    + " | Project=[" + nextProjectName + "]"
+                                    + " | Issue=[" + dto.getIssueCases() + "]"
+                                    + " | Submitted=["
+                                    + dto.getAnnotationsSubmittedPareidolia()
+                                    + "]"
+                    );
 
                 } else {
 
-                    // Normal continuation row
+                    /*
+                     * Normal weekly/continuation row.
+                     */
+                    if (lastProjectName == null) {
+
+                        throw new IllegalStateException(
+                                "Blank project encountered before any project header"
+                                        + " | Sheet=[" + sheetName + "]"
+                                        + " | Row=[" + dto.getSourceRowNumber() + "]"
+                        );
+                    }
+
                     dto.setProjectName(lastProjectName);
                 }
-            }
-            // Project Type
-            if (dto.getProjectType() != null
-                    && !dto.getProjectType().isBlank()) {
-
-                lastProjectType =
-                        dto.getProjectType().trim();
-
-            } else {
-
-                dto.setProjectType(
-                        lastProjectType
-                );
             }
 
             // Priority
@@ -409,7 +458,24 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
              * creating Period 5.
              */
 
-            if (reportingPeriod >= 4
+            if (preProjectRow) {
+
+                /*
+                 * Row belongs to the next project,
+                 * but it is NOT one of that project's
+                 * weekly reporting periods.
+                 */
+                dto.setReportingPeriod(0);
+
+                System.out.println(
+                        "PRE-PROJECT PERIOD 0"
+                                + " | Sheet=[" + sheetName + "]"
+                                + " | Row=[" + dto.getSourceRowNumber() + "]"
+                                + " | Project=[" + dto.getProjectName() + "]"
+                                + " | Issue=[" + dto.getIssueCases() + "]"
+                );
+
+            } else if (reportingPeriod >= 4
                     && dto.getWeekOf() != null
                     && dto.getWeekOf().isBlank()) {
 
@@ -439,16 +505,12 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                                     + " | Week=[" + dto.getWeekOf() + "]"
                     );
 
-                    /*
-                     * Do not create Period 5.
-                     *
-                     * Skip this unexpected row for now.
-                     */
                     continue;
                 }
 
                 dto.setReportingPeriod(reportingPeriod);
             }
+
 
             /*
              * STEP 6
@@ -588,5 +650,56 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
         }
 
         return null;
+    }
+
+    private boolean isImmediatelyBeforeNextProject(
+            List<List<Object>> rows,
+            int currentIndex,
+            Map<String, Integer> columnIndexMap) {
+
+        for (int j = currentIndex + 1; j < rows.size(); j++) {
+
+            List<Object> nextRow = rows.get(j);
+
+            if (!hasAnyRawValue(nextRow)) {
+                continue;
+            }
+
+            GoogleSheetRowDto nextDto =
+                    mapper.mapRow(
+                            nextRow,
+                            columnIndexMap
+                    );
+
+            /*
+             * Stop at the first genuinely non-empty row.
+             *
+             * If it explicitly contains a project name,
+             * the current row sits immediately before
+             * a new project block.
+             */
+            return nextDto.getProjectName() != null
+                    && !nextDto.getProjectName().isBlank();
+        }
+
+        return false;
+    }
+
+    private boolean hasAnyRawValue(List<Object> row) {
+
+        if (row == null || row.isEmpty()) {
+            return false;
+        }
+
+        for (Object value : row) {
+
+            if (value != null
+                    && !value.toString().trim().isEmpty()) {
+
+                return true;
+            }
+        }
+
+        return false;
     }
 }
