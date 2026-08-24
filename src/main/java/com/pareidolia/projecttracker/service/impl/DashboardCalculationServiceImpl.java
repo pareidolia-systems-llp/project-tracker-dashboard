@@ -201,22 +201,25 @@ public class DashboardCalculationServiceImpl
 
         for (Project project : history) {
 
-            String weekOf = project.getWeekOf();
             int issue = value(project.getIssueCases());
 
+            Integer reportingPeriod =
+                    project.getReportingPeriod();
+
             /*
-             * Preserve the existing business rule:
-             * blank Week Of rows are not treated as weekly Issue Cases.
+             * Reporting Period 0 represents the cumulative /
+             * carry-forward Issue value entering the month.
+             *
+             * Do NOT add it again because the actual weekly
+             * issue rows from previous history have already
+             * contributed to Issue PTD.
              */
-            if (weekOf == null || weekOf.trim().isEmpty()) {
+            if (Integer.valueOf(0).equals(reportingPeriod)) {
 
                 /*
-                 * IMPORTANT:
-                 * Even though the issue value is skipped,
-                 * this may still be the selected Period.
-                 *
-                 * Therefore we must stop AFTER identifying the
-                 * selected period.
+                 * If Period 0 itself is the selected row,
+                 * stop here so we don't include future periods
+                 * from the same month.
                  */
                 if (samePeriod(project, currentProject)) {
                     break;
@@ -225,6 +228,12 @@ public class DashboardCalculationServiceImpl
                 continue;
             }
 
+            /*
+             * Period 1-4 = genuine reporting-period Issue.
+             *
+             * Week Of may legitimately be blank because the
+             * week range may not have been entered.
+             */
             total += issue;
 
             if (samePeriod(project, currentProject)) {
@@ -246,54 +255,94 @@ public class DashboardCalculationServiceImpl
         int total = 0;
 
         System.out.println();
-        System.out.println("========== ISSUE PTD CALCULATION ==========");
         System.out.println(
-                "Selected Month = " + currentProject.getReportingMonth()
-                        + " | Selected Week = " + currentProject.getWeekOf()
+                "========== ISSUE PTD CALCULATION =========="
+        );
+
+        System.out.println(
+                "Selected Month = "
+                        + currentProject.getReportingMonth()
+                        + " | Selected Week = "
+                        + currentProject.getWeekOf()
         );
 
         for (Project project : history) {
 
-            String weekOf = project.getWeekOf();
-            int issue = value(project.getIssueCases());
+            int issue =
+                    value(project.getIssueCases());
+
+            Integer reportingPeriod =
+                    project.getReportingPeriod();
+
+            String weekOf =
+                    project.getWeekOf();
 
             System.out.println(
                     "CHECKING ISSUE -> "
-                            + "Month=[" + project.getReportingMonth() + "]"
-                            + " | Week=[" + weekOf + "]"
-                            + " | Issue=[" + issue + "]"
+                            + "Month=["
+                            + project.getReportingMonth()
+                            + "]"
+                            + " | Period=["
+                            + reportingPeriod
+                            + "]"
+                            + " | Week=["
+                            + weekOf
+                            + "]"
+                            + " | Issue=["
+                            + issue
+                            + "]"
             );
 
             /*
-             * Issue PTD is calculated only from actual weekly rows.
-             *
-             * A blank Week Of represents a project/month-level value
-             * and must not be treated as a new weekly issue count.
+             * Period 0 is cumulative/carry-forward.
+             * It must not be added again.
              */
-            if (weekOf == null || weekOf.trim().isEmpty()) {
+            if (Integer.valueOf(0).equals(reportingPeriod)) {
 
                 System.out.println(
-                        "SKIPPED ISSUE -> Blank Week Of"
-                                + " | Issue=" + issue
+                        "SKIPPED ISSUE -> Period 0 carry-forward"
+                                + " | Issue="
+                                + issue
                 );
 
                 continue;
             }
 
+            /*
+             * Period 1-4 contains genuine Issue Cases.
+             * Add them even when Week Of is blank.
+             */
             if (issue > 0) {
 
                 total += issue;
 
                 System.out.println(
                         "ADDING ISSUE -> "
-                                + "Month=[" + project.getReportingMonth() + "]"
-                                + " | Week=[" + weekOf + "]"
-                                + " | Issue=" + issue
-                                + " | Running PTD=" + total
+                                + "Month=["
+                                + project.getReportingMonth()
+                                + "]"
+                                + " | Period=["
+                                + reportingPeriod
+                                + "]"
+                                + " | Week=["
+                                + weekOf
+                                + "]"
+                                + " | Issue="
+                                + issue
+                                + " | Running PTD="
+                                + total
                 );
             }
 
-            if (sameWeek(project, currentProject)) {
+            /*
+             * calculateIssuePtd() is used by the Week-based
+             * endpoint. A blank Week Of row cannot itself be
+             * the selected week, so only compare actual Week
+             * Of values here.
+             */
+            if (weekOf != null
+                    && !weekOf.trim().isEmpty()
+                    && sameWeek(project, currentProject)) {
 
                 System.out.println(
                         "SELECTED WEEK REACHED -> stopping calculation"
