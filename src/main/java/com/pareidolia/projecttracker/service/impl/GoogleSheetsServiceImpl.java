@@ -315,6 +315,8 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
             boolean preProjectRow = false;
             // Project Name
 
+
+            boolean explicitProjectContextRow = false;
             // Project Name
             if (dto.getProjectName() != null
                     && !dto.getProjectName().isBlank()) {
@@ -324,6 +326,54 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
 
                 // New project starts again from period 0
                 reportingPeriod = 0;
+
+                boolean blankWeek =
+                        dto.getWeekOf() == null
+                                || dto.getWeekOf().isBlank();
+
+                boolean hasIssue =
+                        hasValue(dto.getIssueCases());
+
+                boolean noAssigned =
+                        !hasValue(dto.getAssignedToPareidolia());
+
+                boolean noAssignedDate =
+                        !hasValue(dto.getAssignedDate());
+
+                boolean noSubmitted =
+                        !hasValue(dto.getAnnotationsSubmittedPareidolia());
+
+                /*
+                 * Some project blocks begin with a cumulative Issue row.
+                 *
+                 * Example:
+                 *
+                 * ICH Small Volume Hemorrhage
+                 * Week Of = blank
+                 * Assigned = blank
+                 * Assigned Date = blank
+                 * Submitted = blank
+                 * Issue = 516
+                 *
+                 * The Issue value represents cumulative context
+                 * entering the month. It is NOT Reporting Period 1.
+                 */
+                if (blankWeek
+                        && hasIssue
+                        && noAssigned
+                        && noAssignedDate
+                        && noSubmitted) {
+
+                    explicitProjectContextRow = true;
+
+                    System.out.println(
+                            "EXPLICIT PROJECT CONTEXT ROW"
+                                    + " | Sheet=[" + sheetName + "]"
+                                    + " | Row=[" + dto.getSourceRowNumber() + "]"
+                                    + " | Project=[" + dto.getProjectName() + "]"
+                                    + " | Issue=[" + dto.getIssueCases() + "]"
+                    );
+                }
 
             } else {
 
@@ -458,7 +508,7 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
              * creating Period 5.
              */
 
-            if (preProjectRow) {
+            if (preProjectRow || explicitProjectContextRow) {
 
                 /*
                  * Row belongs to the next project,
