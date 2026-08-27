@@ -591,6 +591,7 @@ class DashboardCalculationServiceImplTest {
         assertEquals(100, result.getAssignedWeekly());
         assertEquals(100, result.getFreshCases());
         assertEquals(0, result.getCarryForwardedCases());
+
     }
     private Project project(
             String projectName,
@@ -620,4 +621,6 @@ class DashboardCalculationServiceImplTest {
 
                 .build();
     }
+
+
 }
