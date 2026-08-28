@@ -115,8 +115,14 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
             String sheetName)
             throws IOException {
 
+        String endColumn = "AA";
+
+        if ("Feb2025".equalsIgnoreCase(sheetName.trim())) {
+            endColumn = "Z";
+        }
+
         String sheetRange =
-                "'" + sheetName + "'!A2:Z";
+                "'" + sheetName + "'!A2:" + endColumn;
 
         ValueRange response = sheets.spreadsheets()
                 .values()
@@ -645,12 +651,22 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
     private boolean isSpacerRow(
             GoogleSheetRowDto dto) {
 
-        return dto.getWeekOf().isBlank()
-                && dto.getAssignedToPareidolia().isBlank()
-                && dto.getAnnotationsSubmittedPareidolia().isBlank()
-                && dto.getCasesMovedToLabels().isBlank()
-                && dto.getAnnotationsCompleted().isBlank()
-                && dto.getIssueCases().isBlank();
+        return !hasValue(dto.getWeekOf())
+                && !hasValue(dto.getAssignedToPareidolia())
+                && !hasValue(dto.getAssignedDate())
+
+                && !hasValue(dto.getAnnotationPendingFromPareidolia())
+                && !hasValue(dto.getReviewsPendingFromPareidolia())
+                && !hasValue(dto.getPendingRapidAiReview())
+                && !hasValue(dto.getRapidReviewWeeklyAssigned())
+
+                && !hasValue(dto.getAnnotationsSubmittedPareidolia())
+                && !hasValue(dto.getIssueCases())
+                && !hasValue(dto.getCasesMovedToLabels())
+                && !hasValue(dto.getAnnotationsCompleted())
+
+                && !hasValue(dto.getPendingAnnotations())
+                && !hasValue(dto.getEtd());
     }
 
     private boolean hasProjectLevelData(GoogleSheetRowDto dto) {
