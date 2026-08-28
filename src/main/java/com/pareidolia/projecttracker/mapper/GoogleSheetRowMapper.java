@@ -88,6 +88,32 @@ public class GoogleSheetRowMapper {
 
         Integer index = columnIndexMap.get(normalize(columnName));
 
+        if (PENDING_ANNOTATIONS.equals(columnName)) {
+
+            System.out.println("========== COLUMN Z ==========");
+            System.out.println("Constant: [" + PENDING_ANNOTATIONS + "]");
+            System.out.println("Normalized: [" + normalize(PENDING_ANNOTATIONS) + "]");
+            System.out.println("Index: " + index);
+            System.out.println("Row size: " + row.size());
+
+            System.out.println(
+                    "Possible headers: " +
+                            columnIndexMap.keySet()
+                                    .stream()
+                                    .filter(k ->
+                                            k.contains("pending")
+                                                    || k.contains("labels")
+                                                    || k.contains("assigned"))
+                                    .toList()
+            );
+
+            if (index != null && index < row.size()) {
+                System.out.println("RAW Z VALUE = [" + row.get(index) + "]");
+            }
+
+            System.out.println("==============================");
+        }
+
         if (index == null || index >= row.size()) {
             return "";
         }

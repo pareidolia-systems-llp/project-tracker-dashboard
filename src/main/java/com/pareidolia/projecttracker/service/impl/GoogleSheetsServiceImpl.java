@@ -117,13 +117,16 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
 
         String endColumn = "AA";
 
+        /*
+         * Feb2025 is an older sheet and does not extend to column AA.
+         * Reading A2:AA causes Google Sheets API INVALID_ARGUMENT.
+         */
         if ("Feb2025".equalsIgnoreCase(sheetName.trim())) {
             endColumn = "Z";
         }
 
         String sheetRange =
                 "'" + sheetName + "'!A2:" + endColumn;
-
         ValueRange response = sheets.spreadsheets()
                 .values()
                 .get(spreadsheetId, sheetRange)
@@ -651,22 +654,12 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
     private boolean isSpacerRow(
             GoogleSheetRowDto dto) {
 
-        return !hasValue(dto.getWeekOf())
-                && !hasValue(dto.getAssignedToPareidolia())
-                && !hasValue(dto.getAssignedDate())
-
-                && !hasValue(dto.getAnnotationPendingFromPareidolia())
-                && !hasValue(dto.getReviewsPendingFromPareidolia())
-                && !hasValue(dto.getPendingRapidAiReview())
-                && !hasValue(dto.getRapidReviewWeeklyAssigned())
-
-                && !hasValue(dto.getAnnotationsSubmittedPareidolia())
-                && !hasValue(dto.getIssueCases())
-                && !hasValue(dto.getCasesMovedToLabels())
-                && !hasValue(dto.getAnnotationsCompleted())
-
-                && !hasValue(dto.getPendingAnnotations())
-                && !hasValue(dto.getEtd());
+        return dto.getWeekOf().isBlank()
+                && dto.getAssignedToPareidolia().isBlank()
+                && dto.getAnnotationsSubmittedPareidolia().isBlank()
+                && dto.getCasesMovedToLabels().isBlank()
+                && dto.getAnnotationsCompleted().isBlank()
+                && dto.getIssueCases().isBlank();
     }
 
     private boolean hasProjectLevelData(GoogleSheetRowDto dto) {

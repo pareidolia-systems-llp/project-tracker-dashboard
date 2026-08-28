@@ -108,6 +108,16 @@ public class ProjectMapper {
                 parseInteger(dto.getAnnotationsCompleted())
         );
 
+        System.out.println(
+                "COLUMN Z -> Project="
+                        + dto.getProjectName()
+                        + " | Period="
+                        + dto.getReportingPeriod()
+                        + " | Raw Z=["
+                        + dto.getPendingAnnotations()
+                        + "]"
+        );
+
         project.setPendingAnnotations(
                 parseInteger(dto.getPendingAnnotations())
         );
