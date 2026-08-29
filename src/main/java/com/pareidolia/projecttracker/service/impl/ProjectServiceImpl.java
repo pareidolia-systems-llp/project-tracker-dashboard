@@ -54,6 +54,18 @@ public class ProjectServiceImpl implements ProjectService {
 
         }
 
+        /*
+         * Make sure all synchronized rows are written before
+         * project-month Health is calculated.
+         */
+        projectRepository.flush();
+
+        /*
+         * Second pass:
+         * calculate one Health for each project + reporting month.
+         */
+        recalculateProjectMonthHealth(rows);
+
         log.info("Synchronization completed successfully. Processed {} rows.", processed);
     }
 
@@ -95,7 +107,6 @@ public class ProjectServiceImpl implements ProjectService {
                         + project.getReportingMonth()
         );
 
-        updateProjectHealth(project);
 
         saveProject(project);
 
@@ -142,14 +153,13 @@ public class ProjectServiceImpl implements ProjectService {
     /**
      * Updates calculated fields.
      */
-    private void updateProjectHealth(Project project) {
-
-        project.setProjectHealth(
-                calculateProjectHealth(project)
-        );
-
-    }
-
+//    private void updateProjectHealth(Project project) {
+//
+//        project.setProjectHealth(
+//                calculateProjectHealth(project)
+//        );
+//
+//    }
 
 
     /**
@@ -180,22 +190,187 @@ public class ProjectServiceImpl implements ProjectService {
     /**
      * Version 1 Project Health Calculation.
      */
-    private String calculateProjectHealth(Project project) {
+//    private String calculateProjectHealth(Project project) {
+//
+//        if (project.getPendingAnnotations() == null
+//                || project.getPendingAnnotations() == 0) {
+//
+//            return "GREEN";
+//        }
+//
+//        // Future Version
+//        // ETD
+//        // Priority
+//        // Delay
+//        // SLA
+//        // Completion %
+//
+//        return "GREEN";
+//    }
+    private void recalculateProjectMonthHealth(
+            List<GoogleSheetRowDto> sourceRows) {
 
-        if (project.getPendingAnnotations() == null
-                || project.getPendingAnnotations() == 0) {
+        /*
+         * Get each Project + Reporting Month combination only once.
+         */
+        var projectMonths = sourceRows.stream()
 
-            return "GREEN";
+                .filter(this::isValidProject)
+
+                .filter(dto ->
+                        dto.getReportingMonth() != null
+                                && !dto.getReportingMonth().isBlank()
+                )
+
+                .map(dto ->
+                        new ProjectMonthKey(
+                                dto.getProjectName(),
+                                dto.getReportingMonth()
+                        )
+                )
+
+                .distinct()
+
+                .toList();
+
+
+        for (ProjectMonthKey key : projectMonths) {
+
+            List<Project> monthRows =
+                    projectRepository
+                            .findByProjectNameAndReportingMonth(
+                                    key.projectName(),
+                                    key.reportingMonth()
+                            );
+
+            if (monthRows.isEmpty()) {
+                continue;
+            }
+
+            /*
+             * Period 0 is context/carry-forward.
+             *
+             * Health should be calculated from genuine
+             * reporting rows only.
+             */
+            List<Project> reportingRows =
+                    monthRows.stream()
+                            .filter(project ->
+                                    project.getReportingPeriod() != null
+                                            && project.getReportingPeriod() > 0
+                            )
+                            .toList();
+
+            if (reportingRows.isEmpty()) {
+                continue;
+            }
+
+
+            /*
+             * Pending can appear on a different row from ETD.
+             *
+             * We only need to know whether pending cases exist.
+             * MAX is safer than SUM because we do not want to
+             * accidentally double-count repeated values.
+             */
+            int pendingCases =
+                    reportingRows.stream()
+
+                            .map(Project::getPendingAnnotations)
+
+                            .filter(value -> value != null)
+
+                            .max(Integer::compareTo)
+
+                            .orElse(0);
+
+
+            /*
+             * Find the most recent reporting-period row
+             * containing a nonblank ETD.
+             *
+             * Example:
+             *
+             * Pilot
+             * P1 -> Pending 161
+             * P2 -> ETD 31st July
+             *
+             * Effective ETD = P2's ETD.
+             */
+            Project etdRow =
+                    reportingRows.stream()
+
+                            .filter(project ->
+                                    project.getEtd() != null
+                                            && !project.getEtd().isBlank()
+                            )
+
+                            .max(
+                                    java.util.Comparator.comparingInt(
+                                            project ->
+                                                    project.getReportingPeriod() == null
+                                                            ? -1
+                                                            : project.getReportingPeriod()
+                                    )
+                            )
+
+                            .orElse(null);
+
+
+            String effectiveEtd =
+                    etdRow == null
+                            ? null
+                            : etdRow.getEtd();
+
+
+            /*
+             * reportingMonthDate should be the same for all
+             * rows in this project/month.
+             */
+            java.time.LocalDate reportingMonthDate =
+                    monthRows.get(0).getReportingMonthDate();
+
+
+            String health =
+                    projectMapper.calculateProjectHealth(
+                            pendingCases,
+                            effectiveEtd,
+                            reportingMonthDate
+                    );
+
+
+            /*
+             * Health describes the PROJECT for that month,
+             * not an individual reporting row.
+             *
+             * Therefore apply the same Health to all rows
+             * including Period 0.
+             */
+            for (Project project : monthRows) {
+
+                project.setProjectHealth(health);
+            }
+
+
+            projectRepository.saveAll(monthRows);
+
+            log.info(
+                    "Project Health -> Project='{}' | Month='{}' | Pending={} | ETD='{}' | Health={}",
+                    key.projectName(),
+                    key.reportingMonth(),
+                    pendingCases,
+                    effectiveEtd,
+                    health
+            );
         }
 
-        // Future Version
-        // ETD
-        // Priority
-        // Delay
-        // SLA
-        // Completion %
 
-        return "GREEN";
+    }
+
+    private record ProjectMonthKey(
+            String projectName,
+            String reportingMonth
+    ) {
     }
 
 }

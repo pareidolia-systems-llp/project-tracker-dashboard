@@ -23,6 +23,12 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
 
     List<Project> findByProjectName(String projectName);
 
+    // Used for project-month level Health calculation
+    List<Project> findByProjectNameAndReportingMonth(
+            String projectName,
+            String reportingMonth
+    );
+
 
 }
 
