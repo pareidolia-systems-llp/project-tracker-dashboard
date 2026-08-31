@@ -215,6 +215,8 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
 
         int reportingPeriod = 0;
 
+        boolean preProjectBlockActive = false;
+
         for (int i = 1; i < rows.size(); i++) {
 
             List<Object> row = rows.get(i);
@@ -330,11 +332,40 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
             if (dto.getProjectName() != null
                     && !dto.getProjectName().isBlank()) {
 
-                // Explicit project name = start/current project block
-                lastProjectName = dto.getProjectName().trim();
+                String explicitProjectName =
+                        dto.getProjectName().trim();
 
-                // New project starts again from period 0
-                reportingPeriod = 0;
+                /*
+                 * If we already discovered this project's rows above
+                 * the explicit Project Name, do NOT restart its
+                 * reporting periods.
+                 *
+                 * Example:
+                 * Issue 35 -> Aortic P0
+                 * Issue 91 -> Aortic P1
+                 * Aortic Dissection name appears afterward.
+                 */
+                boolean confirmsPreProjectBlock =
+                        preProjectBlockActive
+                                && explicitProjectName.equals(lastProjectName);
+
+                if (confirmsPreProjectBlock) {
+
+                    /*
+                     * The Project Name simply confirms the project
+                     * we already resolved.
+                     */
+                    preProjectBlockActive = false;
+
+                } else {
+
+                    /*
+                     * Normal new project.
+                     */
+                    lastProjectName = explicitProjectName;
+                    reportingPeriod = 0;
+                    preProjectBlockActive = false;
+                }
 
                 boolean blankWeek =
                         dto.getWeekOf() == null
@@ -389,24 +420,35 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                 boolean blankWeek =
                         dto.getWeekOf() == null
                                 || dto.getWeekOf().isBlank();
-
-                boolean projectLevelRowBeforeNextProject =
-                        blankWeek
-                                && hasProjectLevelData(dto)
-                                && isImmediatelyBeforeNextProject(
+                String nextProjectName =
+                        findNextProjectName(
                                 rows,
                                 i,
                                 columnIndexMap
                         );
 
-                if (projectLevelRowBeforeNextProject) {
+                boolean startsPreProjectBlock =
+                        !preProjectBlockActive
+                                && blankWeek
+                                && hasProjectLevelData(dto)
+                                && isClearlyPreProjectContext(dto)
+                                && nextProjectName != null
+                                && !nextProjectName.equals(lastProjectName)
+                                && (
+                                isImmediatelyBeforeNextProject(
+                                        rows,
+                                        i,
+                                        columnIndexMap
+                                )
+                                        || hasAnotherDataRowBeforeNextProject(
+                                        rows,
+                                        i,
+                                        columnIndexMap
+                                )
+                        );
+                if (startsPreProjectBlock) {
 
-                    String nextProjectName =
-                            findNextProjectName(
-                                    rows,
-                                    i,
-                                    columnIndexMap
-                            );
+
 
                     if (nextProjectName == null) {
 
@@ -431,6 +473,8 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                      */
                     reportingPeriod = 0;
                     preProjectRow = true;
+
+                    preProjectBlockActive = true;
 
                     System.out.println(
                             "PRE-PROJECT ROW RESOLVED"
@@ -492,37 +536,36 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
             /*
              * STEP 4
              *
-             * NOW check whether this is a spacer row.
-             *
-             * We deliberately do this AFTER project
-             * identification.
+             * Ignore genuine spacer rows only after
+             * project ownership has been resolved.
              */
             if (isSpacerRow(dto)) {
-
                 continue;
             }
-            /*
-             * Determine the business reporting period.
-             *
-             * A project can have a maximum of 4 reporting periods:
-             *
-             * 1 = 01-07
-             * 2 = 08-14
-             * 3 = 15-21
-             * 4 = 22-last day
-             *
-             * If we already processed 4 periods and encounter
-             * another data-bearing row with a blank Week Of,
-             * treat it as a project-level row rather than
-             * creating Period 5.
-             */
+
+
+// * Determine the business reporting period.
+//                    *
+//                    * A project can have a maximum of 5 reporting periods.
+// *
+// * Example for July:
+// *
+// * 1 = 01-05
+//                    * 2 = 06-12
+//                    * 3 = 13-19
+//                    * 4 = 20-26
+//                    * 5 = 27-31
+//                    *
+//                    * Period 0 is reserved for cumulative / project-level /
+//                    * pre-project context rows.
+
 
             if (preProjectRow || explicitProjectContextRow) {
 
                 /*
-                 * Row belongs to the next project,
-                 * but it is NOT one of that project's
-                 * weekly reporting periods.
+                 * Row belongs to the project,
+                 * but it is NOT one of the genuine
+                 * reporting periods.
                  */
                 dto.setReportingPeriod(0);
 
@@ -534,43 +577,33 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                                 + " | Issue=[" + dto.getIssueCases() + "]"
                 );
 
-            } else if (reportingPeriod >= 4
-                    && dto.getWeekOf() != null
-                    && dto.getWeekOf().isBlank()) {
-
-                dto.setReportingPeriod(0);
-
-                System.out.println(
-                        "PROJECT LEVEL ROW -> "
-                                + "Sheet=[" + sheetName + "]"
-                                + " | Project=[" + dto.getProjectName() + "]"
-                                + " | Week=[]"
-                                + " | Issue=[" + dto.getIssueCases() + "]"
-                                + " | Submitted=["
-                                + dto.getAnnotationsSubmittedPareidolia()
-                                + "]"
-                );
-
             } else {
 
+                /*
+                 * Genuine reporting row.
+                 *
+                 * Week Of may be filled or blank.
+                 * There is no hard maximum number of reporting periods.
+                 */
                 reportingPeriod++;
 
-                if (reportingPeriod > 4) {
+                dto.setReportingPeriod(reportingPeriod);
+
+                /*
+                 * More than 5 periods is unusual,
+                 * but we must NEVER discard business data.
+                 */
+                if (reportingPeriod > 5) {
 
                     System.out.println(
-                            "WARNING -> More than 4 reporting rows found"
+                            "WARNING -> More than 5 reporting periods found"
                                     + " | Project=[" + dto.getProjectName() + "]"
                                     + " | Sheet=[" + sheetName + "]"
+                                    + " | Period=[" + reportingPeriod + "]"
                                     + " | Week=[" + dto.getWeekOf() + "]"
                     );
-
-                    continue;
                 }
-
-                dto.setReportingPeriod(reportingPeriod);
             }
-
-
             /*
              * STEP 6
              *
@@ -654,12 +687,20 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
     private boolean isSpacerRow(
             GoogleSheetRowDto dto) {
 
-        return dto.getWeekOf().isBlank()
-                && dto.getAssignedToPareidolia().isBlank()
-                && dto.getAnnotationsSubmittedPareidolia().isBlank()
-                && dto.getCasesMovedToLabels().isBlank()
-                && dto.getAnnotationsCompleted().isBlank()
-                && dto.getIssueCases().isBlank();
+        return !hasValue(dto.getWeekOf())
+                && !hasValue(dto.getAssignedToPareidolia())
+                && !hasValue(dto.getAssignedDate())
+                && !hasValue(dto.getAnnotationPendingFromPareidolia())
+                && !hasValue(dto.getReviewsPendingFromPareidolia())
+                && !hasValue(dto.getPendingRapidAiReview())
+                && !hasValue(dto.getRapidReviewWeeklyAssigned())
+                && !hasValue(dto.getAnnotationsSubmittedPareidolia())
+                && !hasValue(dto.getIssueCases())
+                && !hasValue(dto.getCasesMovedToLabels())
+                && !hasValue(dto.getEtd())
+                && !hasValue(dto.getAnnotationsCompleted())
+                && !hasValue(dto.getPendingAnnotations())
+                && !hasValue(dto.getNotes());
     }
 
     private boolean hasProjectLevelData(GoogleSheetRowDto dto) {
@@ -672,6 +713,42 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                 || hasValue(dto.getPendingRapidAiReview())
                 || hasValue(dto.getCasesMovedToLabels())
                 ||hasValue(dto.getAnnotationsCompleted());
+    }
+
+
+    private boolean isClearlyPreProjectContext(
+            GoogleSheetRowDto dto) {
+
+        /*
+         * "Previous Cases" is an explicit carry-forward/context marker.
+         */
+        boolean previousCases =
+                hasValue(dto.getAssignedDate())
+                        && dto.getAssignedDate()
+                        .trim()
+                        .toLowerCase()
+                        .startsWith("previous cases");
+
+        if (previousCases) {
+            return true;
+        }
+
+        /*
+         * Known historical pattern:
+         * an Issue-only row can contain cumulative Issue context
+         * for the project starting immediately below it.
+         */
+        boolean issueOnly =
+                hasValue(dto.getIssueCases())
+                        && !hasValue(dto.getAssignedToPareidolia())
+                        && !hasValue(dto.getAnnotationsSubmittedPareidolia())
+                        && !hasValue(dto.getAnnotationPendingFromPareidolia())
+                        && !hasValue(dto.getReviewsPendingFromPareidolia())
+                        && !hasValue(dto.getPendingRapidAiReview())
+                        && !hasValue(dto.getCasesMovedToLabels())
+                        && !hasValue(dto.getAnnotationsCompleted());
+
+        return issueOnly;
     }
     private boolean hasValue(String value) {
 
@@ -744,6 +821,60 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
         return false;
     }
 
+    private boolean hasAnotherDataRowBeforeNextProject(
+            List<List<Object>> rows,
+            int currentIndex,
+            Map<String, Integer> columnIndexMap) {
+
+        for (int j = currentIndex + 1; j < rows.size(); j++) {
+
+            List<Object> nextRow = rows.get(j);
+
+            if (!hasAnyRawValue(nextRow)) {
+                continue;
+            }
+
+            GoogleSheetRowDto nextDto =
+                    mapper.mapRow(
+                            nextRow,
+                            columnIndexMap
+                    );
+
+            /*
+             * Once the next explicit Project Name appears,
+             * the pre-project block has ended.
+             */
+            if (nextDto.getProjectName() != null
+                    && !nextDto.getProjectName().isBlank()) {
+
+                return false;
+            }
+
+            /*
+             * An unnamed data-bearing row exists before
+             * the next Project Name.
+             *
+             * Example:
+             *
+             * Issue 35  -> Period 0
+             * Issue 91  -> Period 1
+             * Aortic Dissection project name
+             */
+            if (hasProjectLevelData(nextDto)
+                    || hasValue(nextDto.getWeekOf())
+                    || hasValue(nextDto.getAssignedDate())
+                    || hasValue(nextDto.getRapidReviewWeeklyAssigned())
+                    || hasValue(nextDto.getEtd())
+                    || hasValue(nextDto.getPendingAnnotations())
+                    || hasValue(nextDto.getNotes())) {
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private boolean hasAnyRawValue(List<Object> row) {
 
         if (row == null || row.isEmpty()) {
@@ -757,6 +888,53 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
 
                 return true;
             }
+        }
+
+        return false;
+    }
+
+    private boolean isFirstDataRowAfterSpacer(
+            List<List<Object>> rows,
+            int currentIndex) {
+
+        if (currentIndex <= 1) {
+            return false;
+        }
+
+        List<Object> previousRow =
+                rows.get(currentIndex - 1);
+
+        return !hasAnyMeaningfulRawValue(previousRow);
+    }
+    private boolean hasAnyMeaningfulRawValue(
+            List<Object> row) {
+
+        if (row == null || row.isEmpty()) {
+            return false;
+        }
+
+        for (Object value : row) {
+
+            if (value == null) {
+                continue;
+            }
+
+            String text =
+                    value.toString().trim();
+
+            if (text.isEmpty()) {
+                continue;
+            }
+
+            /*
+             * Zero-only cells do not make a separator
+             * a meaningful business-data row.
+             */
+            if (text.matches("0+(\\.0+)?")) {
+                continue;
+            }
+
+            return true;
         }
 
         return false;
