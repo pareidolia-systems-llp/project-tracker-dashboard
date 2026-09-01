@@ -12,20 +12,39 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 
 @Configuration
 public class GoogleSheetsConfig {
 
-    @Value("${google.credentials.path}")
+    @Value("${google.credentials.path:credentials/google-service-account.json}")
     private String credentialsPath;
+
+    @Value("${GOOGLE_SERVICE_ACCOUNT_JSON:}")
+    private String googleServiceAccountJson;
 
     @Bean
     public Sheets sheetsService() throws Exception {
 
-        InputStream inputStream =
-                new ClassPathResource(credentialsPath).getInputStream();
+        InputStream inputStream;
+
+        // Railway / production
+        if (googleServiceAccountJson != null
+                && !googleServiceAccountJson.isBlank()) {
+
+            inputStream = new ByteArrayInputStream(
+                    googleServiceAccountJson.getBytes(StandardCharsets.UTF_8)
+            );
+
+        } else {
+
+            // Local development fallback
+            inputStream =
+                    new ClassPathResource(credentialsPath).getInputStream();
+        }
 
         GoogleCredentials credentials =
                 GoogleCredentials.fromStream(inputStream)
@@ -40,7 +59,6 @@ public class GoogleSheetsConfig {
 
         HttpRequestInitializer requestInitializer = request -> {
 
-            // Keep Google Service Account authentication
             credentialsAdapter.initialize(request);
 
             // Maximum time allowed to establish the connection
