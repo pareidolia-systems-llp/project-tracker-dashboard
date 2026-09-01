@@ -1,6 +1,7 @@
 package com.pareidolia.projecttracker.config;
 
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.sheets.v4.Sheets;
 import com.google.api.services.sheets.v4.SheetsScopes;
@@ -28,12 +29,32 @@ public class GoogleSheetsConfig {
 
         GoogleCredentials credentials =
                 GoogleCredentials.fromStream(inputStream)
-                        .createScoped(Collections.singleton(SheetsScopes.SPREADSHEETS_READONLY));
+                        .createScoped(
+                                Collections.singleton(
+                                        SheetsScopes.SPREADSHEETS_READONLY
+                                )
+                        );
+
+        HttpCredentialsAdapter credentialsAdapter =
+                new HttpCredentialsAdapter(credentials);
+
+        HttpRequestInitializer requestInitializer = request -> {
+
+            // Keep Google Service Account authentication
+            credentialsAdapter.initialize(request);
+
+            // Maximum time allowed to establish the connection
+            request.setConnectTimeout(30_000);
+
+            // Maximum time waiting for Google Sheets to return data
+            request.setReadTimeout(120_000);
+        };
 
         return new Sheets.Builder(
                 GoogleNetHttpTransport.newTrustedTransport(),
                 GsonFactory.getDefaultInstance(),
-                new HttpCredentialsAdapter(credentials))
+                requestInitializer
+        )
                 .setApplicationName("Project Tracker Dashboard")
                 .build();
     }

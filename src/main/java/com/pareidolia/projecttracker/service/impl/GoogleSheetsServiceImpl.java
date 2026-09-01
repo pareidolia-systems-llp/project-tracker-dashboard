@@ -372,16 +372,16 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                                 || dto.getWeekOf().isBlank();
 
                 boolean hasIssue =
-                        hasValue(dto.getIssueCases());
+                        hasMeaningfulValue(dto.getIssueCases());
 
                 boolean noAssigned =
-                        !hasValue(dto.getAssignedToPareidolia());
+                        !hasMeaningfulValue(dto.getAssignedToPareidolia());
 
                 boolean noAssignedDate =
                         !hasValue(dto.getAssignedDate());
 
                 boolean noSubmitted =
-                        !hasValue(dto.getAnnotationsSubmittedPareidolia());
+                        !hasMeaningfulValue(dto.getAnnotationsSubmittedPareidolia());
 
                 /*
                  * Some project blocks begin with a cumulative Issue row.
@@ -739,14 +739,14 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
          * for the project starting immediately below it.
          */
         boolean issueOnly =
-                hasValue(dto.getIssueCases())
-                        && !hasValue(dto.getAssignedToPareidolia())
-                        && !hasValue(dto.getAnnotationsSubmittedPareidolia())
-                        && !hasValue(dto.getAnnotationPendingFromPareidolia())
-                        && !hasValue(dto.getReviewsPendingFromPareidolia())
-                        && !hasValue(dto.getPendingRapidAiReview())
-                        && !hasValue(dto.getCasesMovedToLabels())
-                        && !hasValue(dto.getAnnotationsCompleted());
+                hasMeaningfulValue(dto.getIssueCases())
+                        && !hasMeaningfulValue(dto.getAssignedToPareidolia())
+                        && !hasMeaningfulValue(dto.getAnnotationsSubmittedPareidolia())
+                        && !hasMeaningfulValue(dto.getAnnotationPendingFromPareidolia())
+                        && !hasMeaningfulValue(dto.getReviewsPendingFromPareidolia())
+                        && !hasMeaningfulValue(dto.getPendingRapidAiReview())
+                        && !hasMeaningfulValue(dto.getCasesMovedToLabels())
+                        && !hasMeaningfulValue(dto.getAnnotationsCompleted());
 
         return issueOnly;
     }
@@ -938,5 +938,26 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
         }
 
         return false;
+    }
+    private boolean hasMeaningfulValue(String value) {
+
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+
+        String normalized =
+                value.trim()
+                        .replace(",", "");
+
+        try {
+
+            return Double.parseDouble(normalized) != 0.0;
+
+        } catch (NumberFormatException ex) {
+
+
+            // Text such as "Previous Cases" is meaningful.
+            return true;
+        }
     }
 }

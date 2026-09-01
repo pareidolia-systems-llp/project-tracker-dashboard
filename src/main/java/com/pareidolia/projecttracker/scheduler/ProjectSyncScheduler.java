@@ -18,41 +18,46 @@ public class ProjectSyncScheduler {
     private final ProjectService projectService;
     private final DashboardKpiPopulationService dashboardKpiPopulationService;
 
-   //@Scheduled(cron = "0 */10 * * * *")
- @Scheduled(cron = "0 */5 * * * *")
-//     Keeping this commented only for testing
- @Scheduled(cron = "0 */5 * * * *")
- public void synchronizeProjects() {
+    // @Scheduled(cron = "0 */10 * * * *")
 
-     log.info("Automatic Project Synchronization Started");
+    // TEMPORARILY DISABLED WHILE LINKING ORIGINAL SHEET
+    // @Scheduled(cron = "0 */5 * * * *")
 
-     long startTime = System.currentTimeMillis();
+    public void synchronizeProjects() {
 
-     try {
+        log.info("Automatic Project Synchronization Started");
 
-         // 1. Synchronize Google Sheet → projects
-         projectService.synchronizeProjects();
+        long startTime = System.currentTimeMillis();
 
-         // 2. Refresh Dashboard KPIs
-         int processed =
-                 dashboardKpiPopulationService.populateExistingKpis();
+        try {
 
-         long endTime = System.currentTimeMillis();
+            // 1. Synchronize Google Sheet → projects
+            projectService.synchronizeProjects();
 
-         log.info("Dashboard KPI population completed. Processed={}", processed);
+            // 2. Refresh Dashboard KPIs
+            int processed =
+                    dashboardKpiPopulationService.populateExistingKpis();
 
-         log.info("Automatic Project Synchronization Completed");
-         log.info("Execution Time : {} ms", (endTime - startTime));
+            long endTime = System.currentTimeMillis();
 
-     } catch (GeneralSecurityException | IOException e) {
+            log.info(
+                    "Dashboard KPI population completed. Processed={}",
+                    processed
+            );
 
-         log.error("Synchronization Failed", e);
+            log.info("Automatic Project Synchronization Completed");
+            log.info(
+                    "Execution Time : {} ms",
+                    (endTime - startTime)
+            );
 
-     } catch (Exception e) {
+        } catch (GeneralSecurityException | IOException e) {
 
-         log.error("Dashboard KPI population failed", e);
-     }
- }
+            log.error("Synchronization Failed", e);
 
+        } catch (Exception e) {
+
+            log.error("Dashboard KPI population failed", e);
+        }
+    }
 }
-
