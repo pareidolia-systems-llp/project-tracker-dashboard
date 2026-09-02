@@ -305,11 +305,13 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
              * Reporting month comes directly from
              * the sheet/tab name.
              */
-            dto.setReportingMonth(sheetName);
-            dto.setReportingMonthDate(
-                    ReportingMonthUtil.parse(sheetName)
-            );
+            String normalizedReportingMonth = sheetName.trim();
 
+            dto.setReportingMonth(normalizedReportingMonth);
+
+            dto.setReportingMonthDate(
+                    ReportingMonthUtil.parse(normalizedReportingMonth)
+            );
             /*
              * STEP 3
              *
