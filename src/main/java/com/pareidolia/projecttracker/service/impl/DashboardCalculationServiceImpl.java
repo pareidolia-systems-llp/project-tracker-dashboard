@@ -421,15 +421,12 @@ public class DashboardCalculationServiceImpl
      *     = 480
      *
      * IMPORTANT:
+
      *
-     * We do NOT use issue cases to calculate Assigned PTD.
-     *
-     * We also do NOT calculate carry-forward using:
+     * We calculate carry-forward using:
      *
      *     Assigned - Submitted - Issue
-     *
-     * because issue cases are a separate metric and may contain
-     * cumulative / carried-forward values.
+
      */
     private int calculateAssignedPtd(
             List<Project> history,
@@ -815,9 +812,16 @@ public class DashboardCalculationServiceImpl
                                 previousMonth
                         );
 
+                int monthlyNewIssue =
+                        calculateMonthlyNewIssue(
+                                history,
+                                previousMonth
+                        );
+
                 return Math.max(
                         monthlyAssigned
-                                - monthlySubmitted,
+                                - monthlySubmitted
+                                - monthlyNewIssue,
                         0
                 );
             }
@@ -877,6 +881,44 @@ public class DashboardCalculationServiceImpl
 
             total += value(
                     project.getAnnotationsSubmittedPareidolia()
+            );
+        }
+
+        return total;
+    }
+
+    private int calculateMonthlyNewIssue(
+            List<Project> history,
+            String reportingMonth) {
+
+        int total = 0;
+
+        for (Project project : history) {
+
+            if (!reportingMonth.equals(
+                    project.getReportingMonth())) {
+
+                continue;
+            }
+
+            /*
+             * Period 0 contains cumulative / carry-forward Issue Cases.
+             * Do not subtract it again.
+             *
+             * Only Period > 0 represents genuine new Issue Cases
+             * for that month.
+             */
+            Integer reportingPeriod =
+                    project.getReportingPeriod();
+
+            if (reportingPeriod == null
+                    || reportingPeriod <= 0) {
+
+                continue;
+            }
+
+            total += value(
+                    project.getIssueCases()
             );
         }
 
@@ -1207,4 +1249,16 @@ public class DashboardCalculationServiceImpl
                 .trim()
                 .equalsIgnoreCase("previous cases");
     }
+
+    /*
+     * Carry-forward is reconstructed from the previous month's
+     * workload:
+     *
+     *     Assigned
+     *     - Submitted
+     *     - New Issue Cases
+     *
+     * Period 0 Issue Cases are cumulative/carry-forward values
+     * and must not be subtracted again.
+     */
 }
