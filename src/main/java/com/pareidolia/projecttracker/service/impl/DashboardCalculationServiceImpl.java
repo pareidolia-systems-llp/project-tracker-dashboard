@@ -530,15 +530,23 @@ public class DashboardCalculationServiceImpl
              *     Assigned = 178
              *     Assigned Date = Previous Cases
              */
-            if (previousCases) {
+            if (isPurePreviousCases(assignedDate)) {
 
                 /*
-                 * A Previous Cases row may contain a fresh assignment
-                 * as well.
-                 *
-                 * We determine this by comparing the current
-                 * Previous Cases amount with the previous month's
-                 * actual carry-forward.
+                 * Pure carry-forward.
+                 * Do not add anything to Assigned PTD.
+                 */
+                System.out.println(
+                        "SKIPPED -> Pure Previous Cases"
+                                + " | Assigned="
+                                + assigned
+                );
+
+            } else if (previousCases) {
+
+                /*
+                 * Mixed Previous Cases + fresh assignment.
+                 * Keep existing logic.
                  */
                 int previousMonthCarryForward =
                         findPreviousMonthCarryForward(
@@ -549,9 +557,6 @@ public class DashboardCalculationServiceImpl
                 int freshAssignment =
                         assigned - previousMonthCarryForward;
 
-                /*
-                 * Never allow a negative fresh assignment.
-                 */
                 freshAssignment =
                         Math.max(freshAssignment, 0);
 
@@ -561,7 +566,7 @@ public class DashboardCalculationServiceImpl
 
                     System.out.println(
                             "ADDING -> Fresh Assignment inside "
-                                    + "Previous Cases row"
+                                    + "mixed Previous Cases row"
                                     + " | Assigned="
                                     + assigned
                                     + " | Previous Carry="
@@ -570,17 +575,6 @@ public class DashboardCalculationServiceImpl
                                     + freshAssignment
                                     + " | Running PTD="
                                     + assignedPtd
-                    );
-
-                } else {
-
-                    System.out.println(
-                            "SKIPPED -> Pure Carry Forward / "
-                                    + "Previous Cases"
-                                    + " | Assigned="
-                                    + assigned
-                                    + " | Previous Carry="
-                                    + previousMonthCarryForward
                     );
                 }
 
@@ -670,7 +664,11 @@ public class DashboardCalculationServiceImpl
             /*
              * Previous Cases row
              */
-            if (previousCases) {
+            if (isPurePreviousCases(assignedDate)) {
+
+                // Pure carry-forward: add nothing to PTD.
+
+            } else if (previousCases) {
 
                 int previousMonthCarryForward =
                         findPreviousMonthCarryForward(
@@ -681,9 +679,6 @@ public class DashboardCalculationServiceImpl
                 int freshAssignment =
                         assigned - previousMonthCarryForward;
 
-                /*
-                 * Never allow a negative fresh assignment.
-                 */
                 freshAssignment =
                         Math.max(freshAssignment, 0);
 
@@ -1165,20 +1160,27 @@ public class DashboardCalculationServiceImpl
         String assignedDate =
                 currentProject.getAssignedDate();
 
-        boolean previousCases =
-                isPreviousCases(assignedDate);
+        /*
+         * Pure Previous Cases:
+         * whole Assigned value is carry-forward.
+         */
+        if (isPurePreviousCases(assignedDate)) {
+            return 0;
+        }
 
         /*
          * Normal assignment:
-         * Entire value is fresh.
+         * entire value is fresh.
          */
-        if (!previousCases) {
+        if (!isPreviousCases(assignedDate)) {
             return assigned;
         }
 
         /*
-         * Previous Cases or
-         * Previous Cases + fresh assignment.
+         * Mixed Previous Cases entry:
+         * e.g. "Previous Cases + <date>"
+         *
+         * Preserve the existing historical split logic.
          */
         int currentIndex =
                 history.indexOf(currentProject);
@@ -1193,5 +1195,16 @@ public class DashboardCalculationServiceImpl
                 assigned - previousMonthCarryForward,
                 0
         );
+    }
+
+    private boolean isPurePreviousCases(String assignedDate) {
+
+        if (assignedDate == null) {
+            return false;
+        }
+
+        return assignedDate
+                .trim()
+                .equalsIgnoreCase("previous cases");
     }
 }
