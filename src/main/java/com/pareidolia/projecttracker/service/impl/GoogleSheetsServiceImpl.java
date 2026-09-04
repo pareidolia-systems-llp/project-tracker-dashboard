@@ -437,16 +437,36 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                                 && nextProjectName != null
                                 && !nextProjectName.equals(lastProjectName)
                                 && (
+                                /*
+                                 * Safest case:
+                                 * this context row is directly before
+                                 * the next explicit project.
+                                 */
                                 isImmediatelyBeforeNextProject(
                                         rows,
                                         i,
                                         columnIndexMap
                                 )
-                                        || hasAnotherDataRowBeforeNextProject(
-                                        rows,
-                                        i,
-                                        columnIndexMap
-                                )
+
+                                        ||
+
+                                        /*
+                                         * Historical multi-row pre-project blocks
+                                         * are allowed only when the block begins
+                                         * after a genuine spacer.
+                                         *
+                                         * This prevents continuation rows from the
+                                         * previous project being stolen by the
+                                         * project below.
+                                         */
+                                        (
+                                                isFirstDataRowAfterSpacer(rows, i)
+                                                        && hasAnotherDataRowBeforeNextProject(
+                                                        rows,
+                                                        i,
+                                                        columnIndexMap
+                                                )
+                                        )
                         );
                 if (startsPreProjectBlock) {
 
