@@ -1,63 +1,103 @@
 package com.pareidolia.projecttracker.scheduler;
 
 import com.pareidolia.projecttracker.service.ProjectService;
-import com.pareidolia.projecttracker.service.dashboard.DashboardKpiPopulationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-
-import java.io.IOException;
-import java.security.GeneralSecurityException;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
+@ConditionalOnProperty(
+        name = "scheduler.enabled",
+        havingValue = "true"
+)
 public class ProjectSyncScheduler {
 
     private final ProjectService projectService;
-    private final DashboardKpiPopulationService dashboardKpiPopulationService;
 
-    // @Scheduled(cron = "0 */10 * * * *")
 
-    // TEMPORARILY DISABLED WHILE LINKING ORIGINAL SHEET
-    // @Scheduled(cron = "0 */5 * * * *")
+    /**
+     * Routine synchronization.
+     *
+     * GoogleSheetsService selects only:
+     *
+     * N   = latest reporting month
+     * N-1 = previous reporting month
+     *
+     * ProjectService performs validation,
+     * safe month replacement and KPI rebuild.
+     */
+    @Scheduled(
+            cron = "${scheduler.recent.cron}",
+            zone = "${scheduler.zone}"
+    )
+    public void synchronizeRecentProjects() {
 
-    public void synchronizeProjects() {
+        log.info(
+                "========== SCHEDULED RECENT SYNC STARTED =========="
+        );
 
-        log.info("Automatic Project Synchronization Started");
-
-        long startTime = System.currentTimeMillis();
+        long startTime =
+                System.currentTimeMillis();
 
         try {
 
-            // 1. Synchronize Google Sheet → projects
             projectService.synchronizeProjects();
 
-            // 2. Refresh Dashboard KPIs
-            int processed =
-                    dashboardKpiPopulationService.populateExistingKpis();
-
-            long endTime = System.currentTimeMillis();
-
             log.info(
-                    "Dashboard KPI population completed. Processed={}",
-                    processed
+                    "Scheduled Recent Sync completed successfully."
+                            + " ExecutionTime={} ms",
+                    System.currentTimeMillis() - startTime
             );
 
-            log.info("Automatic Project Synchronization Completed");
+        } catch (Exception ex) {
+
+            log.error(
+                    "Scheduled Recent Sync failed.",
+                    ex
+            );
+        }
+    }
+
+
+    /**
+     * Historical audit.
+     *
+     * Does NOT parse or replace historical Projects.
+     * It only compares raw sheet fingerprints.
+     */
+    @Scheduled(
+            cron = "${scheduler.historical.cron}",
+            zone = "${scheduler.zone}"
+    )
+    public void auditHistoricalProjects() {
+
+        log.info(
+                "========== SCHEDULED HISTORICAL AUDIT STARTED =========="
+        );
+
+        long startTime =
+                System.currentTimeMillis();
+
+        try {
+
+            projectService.auditHistoricalProjects();
+
             log.info(
-                    "Execution Time : {} ms",
-                    (endTime - startTime)
+                    "Scheduled Historical Audit completed successfully."
+                            + " ExecutionTime={} ms",
+                    System.currentTimeMillis() - startTime
             );
 
-        } catch (GeneralSecurityException | IOException e) {
+        } catch (Exception ex) {
 
-            log.error("Synchronization Failed", e);
-
-        } catch (Exception e) {
-
-            log.error("Dashboard KPI population failed", e);
+            log.error(
+                    "Scheduled Historical Audit failed.",
+                    ex
+            );
         }
     }
 }

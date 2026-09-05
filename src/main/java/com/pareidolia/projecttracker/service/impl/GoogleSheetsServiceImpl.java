@@ -1,26 +1,35 @@
 package com.pareidolia.projecttracker.service.impl;
 
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.services.sheets.v4.Sheets;
 import com.google.api.services.sheets.v4.model.Sheet;
 import com.google.api.services.sheets.v4.model.Spreadsheet;
 import com.google.api.services.sheets.v4.model.ValueRange;
 import com.pareidolia.projecttracker.dto.google.GoogleSheetRowDto;
+import com.pareidolia.projecttracker.dto.sync.HistoricalSheetFingerprintDto;
 import com.pareidolia.projecttracker.mapper.ColumnIndexMapper;
 import com.pareidolia.projecttracker.mapper.GoogleSheetRowMapper;
 import com.pareidolia.projecttracker.service.GoogleSheetsService;
+import com.pareidolia.projecttracker.util.ReportingMonthUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import com.pareidolia.projecttracker.util.ReportingMonthUtil;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
-
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 
 import static com.pareidolia.projecttracker.constants.SheetColumns.*;
+
 
 @Service
 public class GoogleSheetsServiceImpl implements GoogleSheetsService {
@@ -28,6 +37,9 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
     private final Sheets sheets;
     private final GoogleSheetRowMapper mapper;
     private final ColumnIndexMapper columnIndexMapper;
+
+
+
 
 
     @Value("${google.sheet.id}")
@@ -47,17 +59,160 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
     public List<GoogleSheetRowDto> readSheet()
             throws GeneralSecurityException, IOException {
 
-        List<GoogleSheetRowDto> allRows = new ArrayList<>();
+        /*
+         * Routine synchronization.
+         *
+         * Only the latest two valid monthly reporting tabs
+         * are processed.
+         */
+        List<String> monthlySheets =
+                getSortedMonthlySheetNames();
 
-        for (String sheetName : getMonthlySheetNames()) {
+        if (monthlySheets.isEmpty()) {
 
-            System.out.println("Reading sheet : " + sheetName);
+            throw new IllegalStateException(
+                    "No valid monthly reporting sheets were found."
+            );
+        }
 
-            allRows.addAll(processSheet(sheetName));
+        int startIndex =
+                Math.max(0, monthlySheets.size() - 2);
+
+        List<String> recentSheets =
+                new ArrayList<>(
+                        monthlySheets.subList(
+                                startIndex,
+                                monthlySheets.size()
+                        )
+                );
+
+        System.out.println(
+                "Routine Sync Sheets = " + recentSheets
+        );
+
+        return readSelectedSheets(recentSheets);
+    }
+
+    private List<GoogleSheetRowDto> readSelectedSheets(
+            List<String> sheetNames)
+            throws IOException {
+
+        List<GoogleSheetRowDto> allRows =
+                new ArrayList<>();
+
+        for (String sheetName : sheetNames) {
+
+            System.out.println(
+                    "Reading sheet : " + sheetName
+            );
+
+            List<GoogleSheetRowDto> sheetRows =
+                    processSheet(sheetName);
+
+            if (sheetRows.isEmpty()) {
+
+                throw new IllegalStateException(
+                        "Selected reporting sheet produced no rows"
+                                + " | Sheet=[" + sheetName + "]"
+                );
+            }
+
+            allRows.addAll(sheetRows);
         }
 
         return allRows;
     }
+
+
+
+    @Override
+    public List<HistoricalSheetFingerprintDto>
+    readHistoricalFingerprints()
+            throws GeneralSecurityException, IOException {
+
+        List<String> monthlySheets =
+                getSortedMonthlySheetNames();
+
+        if (monthlySheets.size() <= 2) {
+
+            System.out.println(
+                    "Historical Audit -> No historical sheets found."
+            );
+
+            return Collections.emptyList();
+        }
+
+
+        /*
+         * Everything except latest two tabs.
+         */
+        List<String> historicalSheets =
+                new ArrayList<>(
+                        monthlySheets.subList(
+                                0,
+                                monthlySheets.size() - 2
+                        )
+                );
+
+
+        System.out.println(
+                "Historical Fingerprint Sheets = "
+                        + historicalSheets
+        );
+
+
+        List<HistoricalSheetFingerprintDto> results =
+                new ArrayList<>();
+
+
+        for (String sheetName : historicalSheets) {
+
+            LocalDate reportingMonthDate =
+                    safelyParseReportingMonth(
+                            sheetName
+                    );
+
+            if (reportingMonthDate == null) {
+
+                throw new IllegalStateException(
+                        "Historical fingerprint failed:"
+                                + " reporting month could not be resolved"
+                                + " | Sheet=[" + sheetName + "]"
+                );
+            }
+
+
+            String contentHash =
+                    calculateRawSheetHash(
+                            sheetName
+                    );
+
+
+            results.add(
+                    new HistoricalSheetFingerprintDto(
+                            sheetName,
+                            reportingMonthDate
+                                    .withDayOfMonth(1),
+                            contentHash
+                    )
+            );
+
+
+            System.out.println(
+                    "Historical Fingerprint Created"
+                            + " | Sheet=[" + sheetName + "]"
+                            + " | Month=["
+                            + reportingMonthDate
+                            + "]"
+            );
+        }
+
+
+        return results;
+    }
+
+
+
 
     private void validateHeaders(
             Map<String, Integer> columnIndexMap) {
@@ -82,33 +237,259 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
         }
     }
 
-    private List<String> getMonthlySheetNames()
+    private List<String> getSortedMonthlySheetNames()
             throws IOException {
 
-        Spreadsheet spreadsheet = sheets.spreadsheets()
-                .get(spreadsheetId)
-                .execute();
+        Spreadsheet spreadsheet =
+                executeWithRetry(
+                        () ->
+                                sheets.spreadsheets()
+                                        .get(spreadsheetId)
+                                        .execute(),
+                        "Read spreadsheet metadata"
+                );
 
-        List<String> monthlySheets = new ArrayList<>();
+        /*
+         * One chosen physical sheet per business month.
+         */
+        Map<LocalDate, MonthlySheet> selectedSheets =
+                new HashMap<>();
+
 
         for (Sheet sheet : spreadsheet.getSheets()) {
 
             String sheetName =
-                    sheet.getProperties().getTitle();
+                    sheet.getProperties()
+                            .getTitle()
+                            .trim();
 
             System.out.println(
                     "Found Sheet : " + sheetName
             );
 
-            // Ignore non-reporting sheets
-            if (!sheetName.matches(".*\\d{4}$")) {
+
+            LocalDate reportingMonthDate =
+                    safelyParseReportingMonth(
+                            sheetName
+                    );
+
+
+            /*
+             * Ignore things such as:
+             *
+             * Sheet1
+             * Master Data
+             * Instructions
+             */
+            if (reportingMonthDate == null) {
+
+                System.out.println(
+                        "Ignoring non-reporting sheet : "
+                                + sheetName
+                );
+
                 continue;
             }
 
-            monthlySheets.add(sheetName);
+
+            reportingMonthDate =
+                    reportingMonthDate.withDayOfMonth(1);
+
+
+            MonthlySheet candidate =
+                    new MonthlySheet(
+                            sheetName,
+                            reportingMonthDate
+                    );
+
+
+            MonthlySheet existing =
+                    selectedSheets.get(
+                            reportingMonthDate
+                    );
+
+
+            /*
+             * First sheet found for this month.
+             */
+            if (existing == null) {
+
+                selectedSheets.put(
+                        reportingMonthDate,
+                        candidate
+                );
+
+                continue;
+            }
+
+
+            boolean existingVersioned =
+                    isVersionedSheetName(
+                            existing.sheetName()
+                    );
+
+            boolean candidateVersioned =
+                    isVersionedSheetName(
+                            candidate.sheetName()
+                    );
+
+
+            /*
+             * Example:
+             *
+             * existing  = Feb2025
+             * candidate = Feb2025 Ver1.1
+             *
+             * Keep the plain/canonical sheet.
+             */
+            if (!existingVersioned
+                    && candidateVersioned) {
+
+                System.out.println(
+                        "Ignoring versioned duplicate reporting sheet"
+                                + " | Month=["
+                                + reportingMonthDate
+                                + "]"
+                                + " | Keeping=["
+                                + existing.sheetName()
+                                + "]"
+                                + " | Ignoring=["
+                                + candidate.sheetName()
+                                + "]"
+                );
+
+                continue;
+            }
+
+
+            /*
+             * Reverse order:
+             *
+             * existing  = Feb2025 Ver1.1
+             * candidate = Feb2025
+             *
+             * Replace the versioned tab with
+             * the canonical/plain tab.
+             */
+            if (existingVersioned
+                    && !candidateVersioned) {
+
+                System.out.println(
+                        "Canonical reporting sheet selected"
+                                + " | Month=["
+                                + reportingMonthDate
+                                + "]"
+                                + " | Replacing=["
+                                + existing.sheetName()
+                                + "]"
+                                + " | With=["
+                                + candidate.sheetName()
+                                + "]"
+                );
+
+                selectedSheets.put(
+                        reportingMonthDate,
+                        candidate
+                );
+
+                continue;
+            }
+
+
+            /*
+             * Two plain sheets for the same month,
+             * or two versioned sheets for the same month.
+             *
+             * Do not guess.
+             */
+            throw new IllegalStateException(
+                    "Ambiguous duplicate reporting month tabs detected"
+                            + " | Month=["
+                            + reportingMonthDate
+                            + "]"
+                            + " | Sheet1=["
+                            + existing.sheetName()
+                            + "]"
+                            + " | Sheet2=["
+                            + candidate.sheetName()
+                            + "]"
+            );
         }
 
-        return monthlySheets;
+
+        List<MonthlySheet> monthlySheets =
+                new ArrayList<>(
+                        selectedSheets.values()
+                );
+
+
+        monthlySheets.sort(
+                Comparator.comparing(
+                        MonthlySheet::reportingMonthDate
+                )
+        );
+
+
+        return monthlySheets.stream()
+                .map(MonthlySheet::sheetName)
+                .toList();
+    }
+
+
+    private boolean isVersionedSheetName(
+            String sheetName) {
+
+        if (sheetName == null) {
+            return false;
+        }
+
+        return sheetName
+                .trim()
+                .matches(
+                        "(?i).*\\s+Ver\\s*\\d+(?:\\.\\d+)*\\s*$"
+                );
+    }
+
+    private LocalDate safelyParseReportingMonth(
+            String sheetName) {
+
+        if (sheetName == null
+                || sheetName.isBlank()) {
+
+            return null;
+        }
+
+        String candidate =
+                sheetName.trim();
+
+        /*
+         * Historical workbook contains versioned month tabs,
+         * for example:
+         *
+         * Feb2025 Ver1.1
+         *
+         * Remove only a trailing "Ver..." suffix.
+         * We do NOT broadly extract dates from arbitrary tab names.
+         */
+        candidate =
+                candidate.replaceFirst(
+                        "(?i)\\s+Ver\\s*\\d+(?:\\.\\d+)*\\s*$",
+                        ""
+                ).trim();
+
+        try {
+
+            LocalDate parsed =
+                    ReportingMonthUtil.parse(candidate);
+
+            return parsed == null
+                    ? null
+                    : parsed.withDayOfMonth(1);
+
+        } catch (Exception ex) {
+
+            return null;
+        }
     }
 
     private List<GoogleSheetRowDto> processSheet(
@@ -121,16 +502,31 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
          * Feb2025 is an older sheet and does not extend to column AA.
          * Reading A2:AA causes Google Sheets API INVALID_ARGUMENT.
          */
-        if ("Feb2025".equalsIgnoreCase(sheetName.trim())) {
+        String normalizedSheetName =
+                sheetName.trim()
+                        .replaceFirst(
+                                "(?i)\\s+Ver\\s*\\d+(?:\\.\\d+)*\\s*$",
+                                ""
+                        )
+                        .trim();
+
+        if ("Feb2025".equalsIgnoreCase(normalizedSheetName)) {
             endColumn = "Z";
         }
-
         String sheetRange =
                 "'" + sheetName + "'!A2:" + endColumn;
-        ValueRange response = sheets.spreadsheets()
-                .values()
-                .get(spreadsheetId, sheetRange)
-                .execute();
+        ValueRange response =
+                executeWithRetry(
+                        () ->
+                                sheets.spreadsheets()
+                                        .values()
+                                        .get(
+                                                spreadsheetId,
+                                                sheetRange
+                                        )
+                                        .execute(),
+                        "Read sheet " + sheetName
+                );
 
         List<List<Object>> rows =
                 response.getValues();
@@ -141,60 +537,14 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
 
         List<Object> headerRow = rows.get(0);
 
-        System.out.println("--------------------------------");
-        System.out.println(
-                "Sheet : " + sheetName
-        );
-        System.out.println(
-                "Header Row : " + headerRow
-        );
-        System.out.println("--------------------------------");
-
         Map<String, Integer> columnIndexMap =
                 columnIndexMapper.buildColumnIndexMap(
                         headerRow
                 );
 
-        System.out.println(
-                "### RAW Y HEADER ### "
-                        + " | Index=24"
-                        + " | Value=["
-                        + (headerRow.size() > 24
-                        ? headerRow.get(24)
-                        : "COLUMN NOT FOUND")
-                        + "]"
-        );
 
-        if ("Feb 2026".equals(sheetName)) {
 
-            System.out.println(
-                    "### FEB 2026 HEADER DEBUG ###"
-                            + " | W(22)=["
-                            + (headerRow.size() > 22
-                            ? headerRow.get(22)
-                            : "NOT FOUND")
-                            + "]"
-                            + " | X(23)=["
-                            + (headerRow.size() > 23
-                            ? headerRow.get(23)
-                            : "NOT FOUND")
-                            + "]"
-                            + " | Y(24)=["
-                            + (headerRow.size() > 24
-                            ? headerRow.get(24)
-                            : "NOT FOUND")
-                            + "]"
-                            + " | Z(25)=["
-                            + (headerRow.size() > 25
-                            ? headerRow.get(25)
-                            : "NOT FOUND")
-                            + "]"
-            );
-        }
-        System.out.println("Headers:");
 
-        columnIndexMap.keySet()
-                .forEach(System.out::println);
 
         validateHeaders(columnIndexMap);
 
@@ -213,7 +563,11 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
         String lastPriority = null;
         String lastTotalDataRequestedByAml = null;
 
+        /*
+         * Current project's running period.
+         */
         int reportingPeriod = 0;
+
 
         boolean preProjectBlockActive = false;
 
@@ -221,28 +575,7 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
 
             List<Object> row = rows.get(i);
 
-            if ("Feb 2026".equals(sheetName)) {
 
-                System.out.println(
-                        "### FEB 2026 DATA Y ###"
-                                + " | RowSize=[" + row.size() + "]"
-                                + " | Project=["
-                                + (row.size() > 1 ? row.get(1) : "N/A")
-                                + "]"
-                                + " | W(22)=["
-                                + (row.size() > 22 ? row.get(22) : "NOT PRESENT")
-                                + "]"
-                                + " | X(23)=["
-                                + (row.size() > 23 ? row.get(23) : "NOT PRESENT")
-                                + "]"
-                                + " | Y(24)=["
-                                + (row.size() > 24 ? row.get(24) : "NOT PRESENT")
-                                + "]"
-                                + " | Z(25)=["
-                                + (row.size() > 25 ? row.get(25) : "NOT PRESENT")
-                                + "]"
-                );
-            }
 
             if (row.isEmpty()) {
                 continue;
@@ -261,7 +594,8 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
 
             dto.setSourceRowNumber(i + 2);
 
-            if (dto.getProjectName().isBlank()
+            if (dto.getProjectName() == null ||
+                    dto.getProjectName().isBlank()
                     && hasProjectLevelData(dto)) {
 
                 String nextProjectName =
@@ -305,7 +639,14 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
              * Reporting month comes directly from
              * the sheet/tab name.
              */
-            String normalizedReportingMonth = sheetName.trim();
+            String normalizedReportingMonth =
+                    sheetName.trim()
+                            .replaceFirst(
+                                    "(?i)\\s+Ver\\s*\\d+(?:\\.\\d+)*\\s*$",
+                                    ""
+                            )
+                            .trim();
+
 
             dto.setReportingMonth(normalizedReportingMonth);
 
@@ -347,28 +688,72 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                  * Issue 91 -> Aortic P1
                  * Aortic Dissection name appears afterward.
                  */
+                boolean sameAsCurrentProject =
+                        explicitProjectName.equals(lastProjectName);
+
                 boolean confirmsPreProjectBlock =
                         preProjectBlockActive
-                                && explicitProjectName.equals(lastProjectName);
+                                && sameAsCurrentProject;
+
 
                 if (confirmsPreProjectBlock) {
 
                     /*
-                     * The Project Name simply confirms the project
-                     * we already resolved.
+                     * The explicit Project Name confirms a project
+                     * already resolved from pre-project/context rows.
+                     *
+                     * Do NOT restart reporting periods.
                      */
                     preProjectBlockActive = false;
+
+
+                } else if (sameAsCurrentProject) {
+
+                    /*
+                     * Historical sheets may repeat the Project Name
+                     * on every reporting row instead of using merged
+                     * or blank continuation cells.
+                     *
+                     * Example:
+                     *
+                     * Aortic QC   Week 1
+                     * Aortic QC   Week 2
+                     * Aortic QC   Week 3
+                     *
+                     * This is still the SAME project block.
+                     *
+                     * Therefore do NOT reset reportingPeriod.
+                     */
+                    preProjectBlockActive = false;
+
+                    System.out.println(
+                            "REPEATED PROJECT NAME -> CONTINUING PERIODS"
+                                    + " | Sheet=[" + sheetName + "]"
+                                    + " | Row=[" + dto.getSourceRowNumber() + "]"
+                                    + " | Project=[" + explicitProjectName + "]"
+                                    + " | CurrentPeriod=[" + reportingPeriod + "]"
+                    );
+
 
                 } else {
 
                     /*
-                     * Normal new project.
+                     * We are switching to another explicit project.
+                     *
+                     * It may be the project's FIRST appearance
+                     * in this month, or it may be returning later
+                     * in the same historical sheet.
+                     *
+                     * Therefore resume its previous positive
+                     * reporting period if we have already seen it.
                      */
-                    lastProjectName = explicitProjectName;
+                    lastProjectName =
+                            explicitProjectName;
+
                     reportingPeriod = 0;
+
                     preProjectBlockActive = false;
                 }
-
                 boolean blankWeek =
                         dto.getWeekOf() == null
                                 || dto.getWeekOf().isBlank();
@@ -487,17 +872,21 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                      * This row belongs to the project that starts
                      * immediately below it.
                      */
-                    lastProjectName = nextProjectName;
+                    lastProjectName =
+                            nextProjectName;
 
                     /*
-                     * Important:
-                     * This is NOT Week 1.
+                     * The current row itself is Period 0 context.
+                     *
+                     * But if this project already appeared earlier
+                     * in the month, retain its last genuine positive
+                     * reporting period so subsequent reporting rows
+                     * continue correctly.
                      */
                     reportingPeriod = 0;
+
                     preProjectRow = true;
-
                     preProjectBlockActive = true;
-
                     System.out.println(
                             "PRE-PROJECT ROW RESOLVED"
                                     + " | Sheet=[" + sheetName + "]"
@@ -631,58 +1020,14 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
              *
              * Debug information.
              */
-            System.out.println(
-                    "### ACCEPTED REJECTED TEST ###"
-                            + " | Sheet=[" + sheetName + "]"
-                            + " | Project=[" + dto.getProjectName() + "]"
-                            + " | Week=[" + dto.getWeekOf() + "]"
-                            + " | Assigned=[" + dto.getAssignedToPareidolia() + "]"
-                            + " | AssignedDate=[" + dto.getAssignedDate() + "]"
-                            + " | Submitted=[" + dto.getAnnotationsSubmittedPareidolia() + "]"
-                            + " | Rejected(W)=[" + dto.getCasesMovedToLabels() + "]"
-                            + " | Accepted(Y)=[" + dto.getAnnotationsCompleted() + "]"
-                            + " | Issue=[" + dto.getIssueCases() + "]"
-                            + " | ReportingPeriod=[" + dto.getReportingPeriod() + "]"
-            );
 
-            System.out.println(
-                    "DTO -> "
-                            + sheetName
-                            + " | Project="
-                            + dto.getProjectName()
-                            + " | Week=["
-                            + dto.getWeekOf()
-                            + "]"
-                            + " | Assigned="
-                            + dto.getAssignedToPareidolia()
-                            + " | Submitted="
-                            + dto.getAnnotationsSubmittedPareidolia()
-                            + " | Issue="
-                            + dto.getIssueCases()
-                            + " | Assigned Date="
-                            + dto.getAssignedDate()
-            );
 
             /*
              * STEP 7
              *
              * Special November debugging for Pilot Coronary CTA.
              */
-            if ("November 2025".equals(sheetName)
-                    && "Pilot Coronary CTA".equals(
-                    dto.getProjectName())) {
 
-                System.out.println(
-                        "========== NOVEMBER PILOT DTO =========="
-                                + "\nSheet = [" + sheetName + "]"
-                                + "\nProject = [" + dto.getProjectName() + "]"
-                                + "\nWeek = [" + dto.getWeekOf() + "]"
-                                + "\nAssigned = [" + dto.getAssignedToPareidolia() + "]"
-                                + "\nAssigned Date = [" + dto.getAssignedDate() + "]"
-                                + "\nSubmitted = [" + dto.getAnnotationsSubmittedPareidolia() + "]"
-                                + "\nIssue = [" + dto.getIssueCases() + "]"
-                );
-            }
 
             /*
              * STEP 8
@@ -961,6 +1306,151 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
 
         return false;
     }
+
+
+    private String calculateRawSheetHash(
+            String sheetName)
+            throws IOException {
+
+        /*
+         * Read the raw physical sheet.
+         *
+         * We intentionally do NOT call processSheet().
+         *
+         * Therefore old reporting-period/parser quirks
+         * cannot break historical change detection.
+         */
+        String escapedSheetName =
+                sheetName.replace(
+                        "'",
+                        "''"
+                );
+
+        String sheetRange =
+                "'" + escapedSheetName + "'";
+
+
+        ValueRange response =
+                executeWithRetry(
+                        () ->
+                                sheets.spreadsheets()
+                                        .values()
+                                        .get(
+                                                spreadsheetId,
+                                                sheetRange
+                                        )
+                                        .setValueRenderOption("UNFORMATTED_VALUE")
+                                        .setDateTimeRenderOption("SERIAL_NUMBER")
+                                        .execute(),
+                        "Fingerprint historical sheet "
+                                + sheetName
+                );
+
+
+        List<List<Object>> rows =
+                response.getValues();
+
+
+        String canonicalContent =
+                buildCanonicalSheetContent(
+                        rows
+                );
+
+
+        try {
+
+            MessageDigest digest =
+                    MessageDigest.getInstance(
+                            "SHA-256"
+                    );
+
+            byte[] hash =
+                    digest.digest(
+                            canonicalContent.getBytes(
+                                    StandardCharsets.UTF_8
+                            )
+                    );
+
+
+            return HexFormat.of()
+                    .formatHex(hash);
+
+
+        } catch (NoSuchAlgorithmException ex) {
+
+            /*
+             * SHA-256 is mandatory in Java,
+             * so this would indicate a JVM problem.
+             */
+            throw new IllegalStateException(
+                    "SHA-256 algorithm is unavailable.",
+                    ex
+            );
+        }
+    }
+
+
+    private String buildCanonicalSheetContent(
+            List<List<Object>> rows) {
+
+        if (rows == null || rows.isEmpty()) {
+            return "ROWS:0";
+        }
+
+
+        StringBuilder builder =
+                new StringBuilder();
+
+
+        /*
+         * Length-prefixed serialization prevents
+         * ambiguous values such as:
+         *
+         * ["AB", "C"]
+         * ["A", "BC"]
+         *
+         * from producing the same canonical string.
+         */
+        builder.append("ROWS:")
+                .append(rows.size())
+                .append('|');
+
+
+        for (List<Object> row : rows) {
+
+            if (row == null) {
+
+                builder.append("ROW:null|");
+                continue;
+            }
+
+
+            builder.append("COLS:")
+                    .append(row.size())
+                    .append('|');
+
+
+            for (Object value : row) {
+
+                String text =
+                        value == null
+                                ? ""
+                                : value.toString();
+
+
+                builder.append(text.length())
+                        .append(':')
+                        .append(text)
+                        .append('|');
+            }
+
+
+            builder.append("ENDROW|");
+        }
+
+
+        return builder.toString();
+    }
     private boolean hasMeaningfulValue(String value) {
 
         if (value == null || value.isBlank()) {
@@ -982,4 +1472,115 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
             return true;
         }
     }
+
+
+
+    private <T> T executeWithRetry(
+            GoogleApiCall<T> operation,
+            String operationName)
+            throws IOException {
+
+        final int maxAttempts = 4;
+
+        long delayMillis = 1000;
+
+        for (int attempt = 1;
+             attempt <= maxAttempts;
+             attempt++) {
+
+            try {
+
+                return operation.execute();
+
+            } catch (GoogleJsonResponseException ex) {
+
+                int statusCode =
+                        ex.getStatusCode();
+
+                boolean retryable =
+                        statusCode == 429
+                                || statusCode == 500
+                                || statusCode == 502
+                                || statusCode == 503
+                                || statusCode == 504;
+
+                if (!retryable
+                        || attempt == maxAttempts) {
+
+                    throw ex;
+                }
+
+                System.out.println(
+                        "Google Sheets API temporary failure"
+                                + " | Operation=[" + operationName + "]"
+                                + " | Status=[" + statusCode + "]"
+                                + " | Attempt=[" + attempt + "]"
+                                + " | Retrying in "
+                                + delayMillis
+                                + " ms"
+                );
+
+                sleepBeforeRetry(delayMillis);
+
+                delayMillis *= 2;
+
+            } catch (IOException ex) {
+
+                if (attempt == maxAttempts) {
+                    throw ex;
+                }
+
+                System.out.println(
+                        "Google Sheets API I/O failure"
+                                + " | Operation=[" + operationName + "]"
+                                + " | Attempt=[" + attempt + "]"
+                                + " | Retrying in "
+                                + delayMillis
+                                + " ms"
+                );
+
+                sleepBeforeRetry(delayMillis);
+
+                delayMillis *= 2;
+            }
+        }
+
+        throw new IllegalStateException(
+                "Google Sheets API retry loop ended unexpectedly."
+        );
+    }
+
+
+    private void sleepBeforeRetry(
+            long delayMillis)
+            throws IOException {
+
+        try {
+
+            Thread.sleep(delayMillis);
+
+        } catch (InterruptedException ex) {
+
+            Thread.currentThread().interrupt();
+
+            throw new IOException(
+                    "Google Sheets API retry interrupted.",
+                    ex
+            );
+        }
+    }
+
+
+    @FunctionalInterface
+    private interface GoogleApiCall<T> {
+
+        T execute() throws IOException;
+    }
+
+    private record MonthlySheet(
+            String sheetName,
+            LocalDate reportingMonthDate) {
+    }
+
+
 }

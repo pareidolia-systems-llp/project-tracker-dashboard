@@ -5,6 +5,17 @@ import java.security.GeneralSecurityException;
 
 public interface ProjectService {
 
-    void synchronizeProjects() throws GeneralSecurityException, IOException;
+    /*
+     * Routine sync:
+     * latest two reporting months only.
+     */
+    void synchronizeProjects()
+            throws GeneralSecurityException, IOException;
 
+
+    /*
+     * Infrequent historical reconciliation.
+     */
+    void auditHistoricalProjects()
+            throws GeneralSecurityException, IOException;
 }

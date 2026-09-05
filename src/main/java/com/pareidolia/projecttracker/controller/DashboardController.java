@@ -3,6 +3,7 @@ package com.pareidolia.projecttracker.controller;
 import com.pareidolia.projecttracker.dto.dashboard.DashboardPtdResponseDto;
 import com.pareidolia.projecttracker.service.dashboard.DashboardCalculationService;
 import com.pareidolia.projecttracker.service.dashboard.DashboardKpiPopulationService;
+import com.pareidolia.projecttracker.security.RefreshApiKeyValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,6 +14,7 @@ public class DashboardController {
 
     private final DashboardCalculationService dashboardCalculationService;
     private final DashboardKpiPopulationService dashboardKpiPopulationService;
+    private final RefreshApiKeyValidator refreshApiKeyValidator;
     @GetMapping("/ptd")
     public DashboardPtdResponseDto getProjectPtd(
 
@@ -45,13 +47,26 @@ public class DashboardController {
         );
     }
 
-    @PostMapping("/kpi/populate")
-    public String populateDashboardKpis() {
+//    @PostMapping("/kpi/populate")
+//    public String populateDashboardKpis() {
+//
+//        int processed =
+//                dashboardKpiPopulationService.populateExistingKpis();
+//
+//        return "Dashboard KPI population completed. Processed: "
+//                + processed;
+//    }
+
+    @PostMapping("/kpi/rebuild")
+    public String rebuildDashboardKpis(
+            @RequestHeader("X-Refresh-Key") String refreshKey) {
+
+        refreshApiKeyValidator.validate(refreshKey);
 
         int processed =
-                dashboardKpiPopulationService.populateExistingKpis();
+                dashboardKpiPopulationService.rebuildAllKpis();
 
-        return "Dashboard KPI population completed. Processed: "
+        return "Dashboard KPI rebuild completed. Processed: "
                 + processed;
     }
 }

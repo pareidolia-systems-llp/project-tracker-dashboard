@@ -1,10 +1,10 @@
 package com.pareidolia.projecttracker.controller;
 
 import com.pareidolia.projecttracker.dto.google.GoogleSheetRowDto;
+import com.pareidolia.projecttracker.security.RefreshApiKeyValidator;
 import com.pareidolia.projecttracker.service.GoogleSheetsService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -12,17 +12,25 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/google-sheet")
+@RequiredArgsConstructor
 public class GoogleSheetsController {
 
     private final GoogleSheetsService googleSheetsService;
+    private final RefreshApiKeyValidator refreshApiKeyValidator;
 
-    public GoogleSheetsController(GoogleSheetsService googleSheetsService) {
-        this.googleSheetsService = googleSheetsService;
-    }
 
+    /*
+     * Diagnostic endpoint only.
+     *
+     * After the sync redesign, readSheet()
+     * reads only the latest two reporting tabs.
+     */
     @GetMapping("/test")
-    public List<GoogleSheetRowDto> testGoogleSheet()
+    public List<GoogleSheetRowDto> testGoogleSheet(
+            @RequestHeader("X-Refresh-Key") String refreshKey)
             throws GeneralSecurityException, IOException {
+
+        refreshApiKeyValidator.validate(refreshKey);
 
         return googleSheetsService.readSheet();
     }
