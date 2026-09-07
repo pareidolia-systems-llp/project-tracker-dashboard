@@ -18,6 +18,10 @@ public interface DashboardKpiRepository extends JpaRepository<DashboardKpi, Long
             Integer reportingPeriod
     );
 
+    int deleteByReportingMonthDate(
+            LocalDate reportingMonthDate
+    );
+
 
     @Modifying(
             flushAutomatically = true,

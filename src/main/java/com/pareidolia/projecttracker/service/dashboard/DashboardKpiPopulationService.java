@@ -2,6 +2,8 @@ package com.pareidolia.projecttracker.service.dashboard;
 
 import java.time.LocalDate;
 
+
+
 public interface DashboardKpiPopulationService {
 
     int populateExistingKpis();
@@ -17,4 +19,7 @@ public interface DashboardKpiPopulationService {
      * Jun change -> Jun onward
      */
     int rebuildKpisFromMonth(LocalDate startMonth);
+
+
+    int rebuildKpisForMonth(LocalDate reportingMonth);
 }

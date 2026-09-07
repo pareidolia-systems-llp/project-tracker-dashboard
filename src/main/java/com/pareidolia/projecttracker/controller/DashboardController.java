@@ -71,6 +71,22 @@ public class DashboardController {
                 + processed;
     }
 
+    @PostMapping("/kpi/rebuild-month")
+    public String rebuildDashboardKpiMonth(
+            @RequestHeader("X-Refresh-Key") String refreshKey,
+            @RequestParam LocalDate month) {
+
+        refreshApiKeyValidator.validate(refreshKey);
+
+        int processed =
+                dashboardKpiPopulationService
+                        .rebuildKpisForMonth(month);
+
+        return "Dashboard KPI month rebuild completed."
+                + " Month: " + month
+                + " | Processed: " + processed;
+    }
+
     /*
      * Full historical KPI rebuild.
      *

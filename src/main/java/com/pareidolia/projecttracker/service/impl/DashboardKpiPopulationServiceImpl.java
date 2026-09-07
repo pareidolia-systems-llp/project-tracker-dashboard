@@ -344,4 +344,91 @@ public class DashboardKpiPopulationServiceImpl
                     );
         }
     }
+
+    @Override
+    @Transactional
+    public int rebuildKpisForMonth(
+            LocalDate reportingMonth) {
+
+        if (reportingMonth == null) {
+            throw new IllegalArgumentException(
+                    "Reporting month must not be null."
+            );
+        }
+
+        log.info(
+                "Starting Dashboard KPI month rebuild."
+                        + " Month={}",
+                reportingMonth
+        );
+
+        int deleted =
+                dashboardKpiRepository
+                        .deleteByReportingMonthDate(
+                                reportingMonth
+                        );
+
+        log.info(
+                "Existing KPI rows removed."
+                        + " Month={}"
+                        + " | Rows={}",
+                reportingMonth,
+                deleted
+        );
+
+        List<Project> projects =
+                projectRepository
+                        .findByReportingMonthDate(
+                                reportingMonth
+                        );
+
+        int processed = 0;
+
+        for (Project project : projects) {
+
+            try {
+
+                populateKpiForProject(project);
+                processed++;
+
+            } catch (Exception ex) {
+
+                log.error(
+                        "Monthly KPI rebuild aborted"
+                                + " -> Project='{}'"
+                                + " | Month='{}'"
+                                + " | Period={}"
+                                + " | Week='{}'",
+                        project.getProjectName(),
+                        project.getReportingMonth(),
+                        project.getReportingPeriod(),
+                        project.getWeekOf(),
+                        ex
+                );
+
+                throw new IllegalStateException(
+                        "Monthly Dashboard KPI rebuild failed"
+                                + " | Month=["
+                                + reportingMonth
+                                + "]"
+                                + " | Project=["
+                                + project.getProjectName()
+                                + "]",
+                        ex
+                );
+            }
+        }
+
+        dashboardKpiRepository.flush();
+
+        log.info(
+                "Dashboard KPI month rebuild completed."
+                        + " Month={}"
+                        + " | Processed={}",
+                reportingMonth,
+                processed
+        );
+
+        return processed;
+    }
 }
