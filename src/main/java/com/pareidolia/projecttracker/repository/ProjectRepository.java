@@ -7,6 +7,8 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 
 public interface ProjectRepository
         extends JpaRepository<Project, Long> {
@@ -62,5 +64,11 @@ public interface ProjectRepository
      */
     long deleteByReportingMonthDateIn(
             Collection<LocalDate> reportingMonthDates
+    );
+
+    Slice<Project>
+    findByReportingMonthDateGreaterThanEqualOrderByReportingMonthDateAscIdAsc(
+            LocalDate startMonth,
+            Pageable pageable
     );
 }

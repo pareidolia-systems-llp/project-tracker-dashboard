@@ -143,10 +143,26 @@ public class ProjectServiceImpl implements ProjectService {
              * Rebuild calculated KPI rows after the
              * source snapshot is known to be valid.
              */
+            LocalDate earliestAffectedMonth =
+                    rows.stream()
+                            .map(
+                                    GoogleSheetRowDto::
+                                            getReportingMonthDate
+                            )
+                            .filter(Objects::nonNull)
+                            .min(LocalDate::compareTo)
+                            .orElseThrow(() ->
+                                    new IllegalStateException(
+                                            "No reporting month found "
+                                                    + "for KPI rebuild."
+                                    )
+                            );
+
             int kpiProcessed =
                     dashboardKpiPopulationService
-                            .rebuildAllKpis();
-
+                            .rebuildKpisFromMonth(
+                                    earliestAffectedMonth
+                            );
 
             log.info(
                     "Recent Project Sync completed successfully."

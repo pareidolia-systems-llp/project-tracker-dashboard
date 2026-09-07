@@ -857,17 +857,7 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                     reportingPeriod = 0;
 
                     preProjectRow = true;
-                    preProjectBlockActive = true;
-                    System.out.println(
-                            "PRE-PROJECT ROW RESOLVED"
-                                    + " | Sheet=[" + sheetName + "]"
-                                    + " | Row=[" + dto.getSourceRowNumber() + "]"
-                                    + " | Project=[" + nextProjectName + "]"
-                                    + " | Issue=[" + dto.getIssueCases() + "]"
-                                    + " | Submitted=["
-                                    + dto.getAnnotationsSubmittedPareidolia()
-                                    + "]"
-                    );
+
 
                 } else {
 
@@ -951,13 +941,7 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                  */
                 dto.setReportingPeriod(0);
 
-                System.out.println(
-                        "PRE-PROJECT PERIOD 0"
-                                + " | Sheet=[" + sheetName + "]"
-                                + " | Row=[" + dto.getSourceRowNumber() + "]"
-                                + " | Project=[" + dto.getProjectName() + "]"
-                                + " | Issue=[" + dto.getIssueCases() + "]"
-                );
+
 
             } else {
 
