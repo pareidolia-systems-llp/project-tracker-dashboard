@@ -119,64 +119,22 @@ public class ProjectMapper {
                 parseInteger(dto.getPendingAnnotations())
         );
 
-        /*
-         * Temporary row-level health calculation.
-         * We are debugging ETD parsing first.
-         */
-        project.setProjectHealth(
-                calculateProjectHealth(
-                        project.getPendingAnnotations(),
-                        project.getEtd(),
-                        project.getReportingMonthDate()
-                )
-        );
 
-        project.setProjectHealth(
-                calculateProjectHealth(
-                        project.getPendingAnnotations(),
-                        project.getEtd(),
-                        project.getReportingMonthDate()
-                )
-        );
-
-        // TEMPORARY DEBUG TEST - REMOVE AFTER TESTING
-//        if ("ICH 4.0 Multi-compartmental Hemorrhage"
-//                .equalsIgnoreCase(project.getProjectName())
-//                && LocalDate.of(2026, 7, 1)
-//                .equals(project.getReportingMonthDate())
-//                && Integer.valueOf(1).equals(dto.getReportingPeriod())) {
-//
-//            project.setProjectHealth("RED");
-//        }
-
-        if ("ICH 4.0 Multi-compartmental Hemorrhage"
-                .equalsIgnoreCase(project.getProjectName())
-                && project.getReportingMonthDate() != null
-                && project.getReportingMonthDate().equals(LocalDate.of(2026, 7, 1))) {
-
-            System.out.println(
-                    ">>> JULY ICH HEALTH CHECK"
-                            + " | Project=" + project.getProjectName()
-                            + " | Period=" + dto.getReportingPeriod()
-                            + " | Pending=" + project.getPendingAnnotations()
-                            + " | ETD=[" + project.getEtd() + "]"
-                            + " | Health=" + project.getProjectHealth()
-            );
-        }
-
-        /* ==========================
-           Reporting Information
-           ========================== */
+       /* ==========================
+   Reporting Information
+   ========================== */
 
         project.setWeekOf(dto.getWeekOf());
         project.setAssignedDate(dto.getAssignedDate());
         project.setReportingPeriod(dto.getReportingPeriod());
 
-        /* ==========================
-           Status Information
-           ========================== */
+    /* ==========================
+       Status Information
+       ========================== */
 
         project.setCurrentStatus(dto.getNotes());
+
+
     }
 
     private Integer parseInteger(String value) {
@@ -198,47 +156,25 @@ public class ProjectMapper {
        PROJECT HEALTH
        ========================================================= */
 
-    public String calculateProjectHealth(Integer pendingCases,
-                                          String etd,
-                                          LocalDate reportingMonthDate) {
+    public String calculateProjectHealth(
+            Integer pendingCases,
+            String etd,
+            LocalDate reportingMonthDate) {
 
         /*
          * No pending cases = GREEN regardless of ETD.
          */
         if (pendingCases == null || pendingCases <= 0) {
-
-            System.out.println(
-                    "HEALTH DEBUG -> Pending=" + pendingCases
-                            + " | Raw ETD=[" + etd + "]"
-                            + " | Result=GREEN (no pending cases)"
-            );
-
             return "GREEN";
         }
 
         LocalDate etdDate =
                 parseEtdDate(etd, reportingMonthDate);
 
-        System.out.println(
-                "HEALTH DEBUG -> Pending=" + pendingCases
-                        + " | Raw ETD=[" + etd + "]"
-                        + " | Parsed ETD=" + etdDate
-                        + " | Today=" + LocalDate.now()
-        );
-
         /*
          * Pending exists but ETD cannot be determined.
-         * Keep GREEN for now.
-         *
-         * We can revise this later if senior wants
-         * UNKNOWN / AMBER for missing ETD.
          */
         if (etdDate == null) {
-
-            System.out.println(
-                    "HEALTH DEBUG -> ETD PARSE FAILED -> GREEN"
-            );
-
             return "GREEN";
         }
 
@@ -248,23 +184,11 @@ public class ProjectMapper {
                         etdDate
                 );
 
-        System.out.println(
-                "HEALTH DEBUG -> Days Remaining="
-                        + daysRemaining
-        );
-
         /*
          * RED must be evaluated first.
-         *
-         * This also makes overdue ETDs RED,
-         * because negative values are <= 2.
+         * Negative values also mean overdue.
          */
         if (daysRemaining <= 2) {
-
-            System.out.println(
-                    "HEALTH DEBUG -> Result=RED"
-            );
-
             return "RED";
         }
 
@@ -272,21 +196,11 @@ public class ProjectMapper {
          * Pending cases and ETD within 5 days.
          */
         if (daysRemaining <= 5) {
-
-            System.out.println(
-                    "HEALTH DEBUG -> Result=AMBER"
-            );
-
             return "AMBER";
         }
 
-        System.out.println(
-                "HEALTH DEBUG -> Result=GREEN"
-        );
-
         return "GREEN";
     }
-
     /* =========================================================
        ETD PARSING
        ========================================================= */

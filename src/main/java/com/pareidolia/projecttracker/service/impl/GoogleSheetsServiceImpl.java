@@ -263,9 +263,6 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                             .getTitle()
                             .trim();
 
-            System.out.println(
-                    "Found Sheet : " + sheetName
-            );
 
 
             LocalDate reportingMonthDate =
@@ -283,10 +280,7 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
              */
             if (reportingMonthDate == null) {
 
-                System.out.println(
-                        "Ignoring non-reporting sheet : "
-                                + sheetName
-                );
+
 
                 continue;
             }
@@ -601,36 +595,13 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                 String nextProjectName =
                         findNextProjectName(rows, i, columnIndexMap);
 
-                System.out.println(
-                        "\n========== BOUNDARY CHECK =========="
-                                + "\nSheet            = [" + sheetName + "]"
-                                + "\nSource Row       = [" + dto.getSourceRowNumber() + "]"
-                                + "\nSerial Number    = [" + dto.getSerialNumber() + "]"
-                                + "\nRaw Project      = [" + dto.getProjectName() + "]"
-                                + "\nPrevious Project = [" + lastProjectName + "]"
-                                + "\nNext Project     = [" + nextProjectName + "]"
-                                + "\nWeek Of          = [" + dto.getWeekOf() + "]"
-                                + "\nAssigned Date    = [" + dto.getAssignedDate() + "]"
-                                + "\nAssigned         = [" + dto.getAssignedToPareidolia() + "]"
-                                + "\nSubmitted        = [" + dto.getAnnotationsSubmittedPareidolia() + "]"
-                                + "\nIssue            = [" + dto.getIssueCases() + "]"
-                                + "\n====================================\n"
-                );
+
             }
 
             if (dto.getProjectName() != null
                     && dto.getProjectName().contains("Neuro3D")) {
 
-                System.out.println(
-                        "========== NEURO3D FOUND ==========" +
-                                "\nSheet = [" + sheetName + "]" +
-                                "\nRaw Row Index = [" + i + "]" +
-                                "\nProject = [" + dto.getProjectName() + "]" +
-                                "\nWeek = [" + dto.getWeekOf() + "]" +
-                                "\nAssigned = [" + dto.getAssignedToPareidolia() + "]" +
-                                "\nSubmitted = [" + dto.getAnnotationsSubmittedPareidolia() + "]" +
-                                "\nIssue = [" + dto.getIssueCases() + "]"
-                );
+
             }
 
             /*

@@ -254,18 +254,6 @@ public class DashboardCalculationServiceImpl
 
         int total = 0;
 
-        System.out.println();
-        System.out.println(
-                "========== ISSUE PTD CALCULATION =========="
-        );
-
-        System.out.println(
-                "Selected Month = "
-                        + currentProject.getReportingMonth()
-                        + " | Selected Week = "
-                        + currentProject.getWeekOf()
-        );
-
         for (Project project : history) {
 
             int issue =
@@ -277,34 +265,11 @@ public class DashboardCalculationServiceImpl
             String weekOf =
                     project.getWeekOf();
 
-            System.out.println(
-                    "CHECKING ISSUE -> "
-                            + "Month=["
-                            + project.getReportingMonth()
-                            + "]"
-                            + " | Period=["
-                            + reportingPeriod
-                            + "]"
-                            + " | Week=["
-                            + weekOf
-                            + "]"
-                            + " | Issue=["
-                            + issue
-                            + "]"
-            );
-
             /*
              * Period 0 is cumulative/carry-forward.
              * It must not be added again.
              */
             if (Integer.valueOf(0).equals(reportingPeriod)) {
-
-                System.out.println(
-                        "SKIPPED ISSUE -> Period 0 carry-forward"
-                                + " | Issue="
-                                + issue
-                );
-
                 continue;
             }
 
@@ -313,25 +278,7 @@ public class DashboardCalculationServiceImpl
              * Add them even when Week Of is blank.
              */
             if (issue > 0) {
-
                 total += issue;
-
-                System.out.println(
-                        "ADDING ISSUE -> "
-                                + "Month=["
-                                + project.getReportingMonth()
-                                + "]"
-                                + " | Period=["
-                                + reportingPeriod
-                                + "]"
-                                + " | Week=["
-                                + weekOf
-                                + "]"
-                                + " | Issue="
-                                + issue
-                                + " | Running PTD="
-                                + total
-                );
             }
 
             /*
@@ -344,19 +291,9 @@ public class DashboardCalculationServiceImpl
                     && !weekOf.trim().isEmpty()
                     && sameWeek(project, currentProject)) {
 
-                System.out.println(
-                        "SELECTED WEEK REACHED -> stopping calculation"
-                );
-
                 break;
             }
         }
-
-        System.out.println(
-                "========== FINAL ISSUE PTD = "
-                        + total
-                        + " =========="
-        );
 
         return total;
     }
@@ -434,17 +371,6 @@ public class DashboardCalculationServiceImpl
 
         int assignedPtd = 0;
 
-        System.out.println(
-                "========== ASSIGNED PTD CALCULATION =========="
-        );
-
-        System.out.println(
-                "Selected Month = "
-                        + currentProject.getReportingMonth()
-                        + " | Selected Week = "
-                        + currentProject.getWeekOf()
-        );
-
         /*
          * Process the history in chronological order.
          */
@@ -461,89 +387,32 @@ public class DashboardCalculationServiceImpl
             boolean previousCases =
                     isPreviousCases(assignedDate);
 
-            System.out.println(
-                    "CHECKING -> "
-                            + "Month="
-                            + project.getReportingMonth()
-                            + " | Week=["
-                            + project.getWeekOf()
-                            + "]"
-                            + " | Assigned="
-                            + assigned
-                            + " | AssignedDate=["
-                            + assignedDate
-                            + "]"
-                            + " | PreviousCases="
-                            + previousCases
-            );
-
             /*
              * No assignment on this row.
              */
             if (assigned <= 0) {
 
-                System.out.println(
-                        "SKIPPED -> Assigned is 0 or blank"
-                );
-
                 if (sameWeek(project, currentProject)) {
-
-                    System.out.println(
-                            "SELECTED WEEK REACHED "
-                                    + "-> stopping calculation"
-                    );
-
                     break;
                 }
 
                 continue;
             }
 
-
-
             /*
-             * ---------------------------------------------------------
              * PURE PREVIOUS CASES
-             * ---------------------------------------------------------
              *
-             * If this is a Previous Cases row, we normally do not
-             * count it as a fresh assignment.
-             *
-             * Example:
-             *
-             * December:
-             *     Assigned = 224
-             *     Assigned Date = Previous Cases
-             *
-             * January:
-             *     Assigned = 143
-             *     Assigned Date = Previous Cases
-             *
-             * February:
-             *     Assigned = 203
-             *     Assigned Date = Previous Cases
-             *
-             * March:
-             *     Assigned = 178
-             *     Assigned Date = Previous Cases
+             * Pure carry-forward.
+             * Do not add anything to Assigned PTD.
              */
             if (isPurePreviousCases(assignedDate)) {
 
-                /*
-                 * Pure carry-forward.
-                 * Do not add anything to Assigned PTD.
-                 */
-                System.out.println(
-                        "SKIPPED -> Pure Previous Cases"
-                                + " | Assigned="
-                                + assigned
-                );
+                // Add nothing.
 
             } else if (previousCases) {
 
                 /*
                  * Mixed Previous Cases + fresh assignment.
-                 * Keep existing logic.
                  */
                 int previousMonthCarryForward =
                         findPreviousMonthCarryForward(
@@ -558,71 +427,24 @@ public class DashboardCalculationServiceImpl
                         Math.max(freshAssignment, 0);
 
                 if (freshAssignment > 0) {
-
                     assignedPtd += freshAssignment;
-
-                    System.out.println(
-                            "ADDING -> Fresh Assignment inside "
-                                    + "mixed Previous Cases row"
-                                    + " | Assigned="
-                                    + assigned
-                                    + " | Previous Carry="
-                                    + previousMonthCarryForward
-                                    + " | Fresh="
-                                    + freshAssignment
-                                    + " | Running PTD="
-                                    + assignedPtd
-                    );
                 }
 
             } else {
 
                 /*
-                 * -----------------------------------------------------
-                 * NORMAL FRESH ASSIGNMENT
-                 * -----------------------------------------------------
-                 *
-                 * Examples:
-                 *
-                 * October:
-                 *     32
-                 *
-                 * January:
-                 *     144
-                 *
-                 * March:
-                 *     100
+                 * Normal fresh assignment.
                  */
                 assignedPtd += assigned;
-
-                System.out.println(
-                        "ADDING -> Fresh Assignment"
-                                + " | Assigned="
-                                + assigned
-                                + " | Running PTD="
-                                + assignedPtd
-                );
             }
 
             /*
              * Stop once the selected week has been processed.
              */
             if (sameWeek(project, currentProject)) {
-
-                System.out.println(
-                        "SELECTED WEEK REACHED "
-                                + "-> stopping calculation"
-                );
-
                 break;
             }
         }
-
-        System.out.println(
-                "========== FINAL ASSIGNED PTD = "
-                        + assignedPtd
-                        + " =========="
-        );
 
         return assignedPtd;
     }

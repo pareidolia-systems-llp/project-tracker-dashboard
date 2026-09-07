@@ -456,21 +456,7 @@ public class ProjectServiceImpl implements ProjectService {
      */
     private void saveProject(Project project) {
 
-        System.out.println(
-                "Saving -> "
-                        + project.getReportingMonth()
-                        + " | "
-                        + project.getProjectName()
-                        + " | Week=[" + project.getWeekOf() + "]"
-                        + " | Assigned="
-                        + project.getAssignedToPareidolia()
-                        + " | Submitted="
-                        + project.getAnnotationsSubmittedPareidolia()
-                        + " | Issue="
-                        + project.getIssueCases()
-                        + " | Assigned Date="
-                        + project.getAssignedDate()
-        );
+
 
         projectRepository.save(project);
 

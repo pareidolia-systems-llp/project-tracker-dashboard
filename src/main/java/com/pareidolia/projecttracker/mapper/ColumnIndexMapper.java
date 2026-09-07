@@ -21,7 +21,7 @@ public class ColumnIndexMapper {
 
                 String header = value.toString();
 
-                System.out.println("[" + header + "]");
+
 
                 columnIndexMap.put(normalize(header), i);
             }
