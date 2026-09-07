@@ -5,6 +5,7 @@ import com.pareidolia.projecttracker.service.dashboard.DashboardCalculationServi
 import com.pareidolia.projecttracker.service.dashboard.DashboardKpiPopulationService;
 import com.pareidolia.projecttracker.security.RefreshApiKeyValidator;
 import lombok.RequiredArgsConstructor;
+import java.time.LocalDate;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -68,5 +69,29 @@ public class DashboardController {
 
         return "Dashboard KPI rebuild completed. Processed: "
                 + processed;
+    }
+
+    /*
+     * Full historical KPI rebuild.
+     *
+     * WARNING:
+     * Resource intensive. Do not use routinely on
+     * constrained production environments.
+     */
+
+    @PostMapping("/kpi/rebuild-from")
+    public String rebuildDashboardKpisFromMonth(
+            @RequestHeader("X-Refresh-Key") String refreshKey,
+            @RequestParam LocalDate startMonth) {
+
+        refreshApiKeyValidator.validate(refreshKey);
+
+        int processed =
+                dashboardKpiPopulationService
+                        .rebuildKpisFromMonth(startMonth);
+
+        return "Dashboard KPI incremental rebuild completed."
+                + " StartMonth: " + startMonth
+                + " | Processed: " + processed;
     }
 }
