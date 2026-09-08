@@ -697,13 +697,7 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                      */
                     preProjectBlockActive = false;
 
-                    System.out.println(
-                            "REPEATED PROJECT NAME -> CONTINUING PERIODS"
-                                    + " | Sheet=[" + sheetName + "]"
-                                    + " | Row=[" + dto.getSourceRowNumber() + "]"
-                                    + " | Project=[" + explicitProjectName + "]"
-                                    + " | CurrentPeriod=[" + reportingPeriod + "]"
-                    );
+
 
 
                 } else {
@@ -764,13 +758,7 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
 
                     explicitProjectContextRow = true;
 
-                    System.out.println(
-                            "EXPLICIT PROJECT CONTEXT ROW"
-                                    + " | Sheet=[" + sheetName + "]"
-                                    + " | Row=[" + dto.getSourceRowNumber() + "]"
-                                    + " | Project=[" + dto.getProjectName() + "]"
-                                    + " | Issue=[" + dto.getIssueCases() + "]"
-                    );
+
                 }
 
             } else {
