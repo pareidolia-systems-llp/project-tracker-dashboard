@@ -593,6 +593,334 @@ class DashboardCalculationServiceImplTest {
         assertEquals(0, result.getCarryForwardedCases());
 
     }
+
+    @Test
+    void shouldTreatPurePreviousCasesAsCarryForwardInsteadOfFreshAssigned() {
+
+        String projectName = "Carry Forward Project";
+
+        Project currentPeriod = project(
+                projectName,
+                "Jan 2026",
+                LocalDate.of(2026, 1, 1),
+                1,
+                "01-07",
+                25,
+                " Previous Cases ",
+                null,
+                null
+        );
+
+        when(historyService.getWeeklyHistory(projectName))
+                .thenReturn(List.of(currentPeriod));
+
+        DashboardPtdResponseDto result =
+                calculationService.calculateProjectPtdByPeriod(
+                        projectName,
+                        "Jan 2026",
+                        1
+                );
+
+        assertEquals(0, result.getFreshCases());
+        assertEquals(0, result.getAssignedWeekly());
+        assertEquals(25, result.getCarryForwardedCases());
+        assertEquals(0, result.getAssignedPtd());
+    }
+
+    @Test
+    void shouldCountNormalCurrentAssignmentAsFreshAssigned() {
+
+        String projectName = "Normal Assignment Project";
+
+        Project currentPeriod = project(
+                projectName,
+                "Jan 2026",
+                LocalDate.of(2026, 1, 1),
+                1,
+                "01-07",
+                30,
+                "03 Jan 2026",
+                0,
+                0
+        );
+
+        when(historyService.getWeeklyHistory(projectName))
+                .thenReturn(List.of(currentPeriod));
+
+        DashboardPtdResponseDto result =
+                calculationService.calculateProjectPtdByPeriod(
+                        projectName,
+                        "Jan 2026",
+                        1
+                );
+
+        assertEquals(30, result.getFreshCases());
+        assertEquals(30, result.getAssignedWeekly());
+        assertEquals(0, result.getCarryForwardedCases());
+        assertEquals(30, result.getAssignedPtd());
+    }
+
+    @Test
+    void shouldTreatPositiveAssignedWithBlankAssignedDateAsFreshWhenWeekIsPresent() {
+
+        String projectName = "Blank Assigned Date Project";
+
+        Project currentPeriod = project(
+                projectName,
+                "Jan 2026",
+                LocalDate.of(2026, 1, 1),
+                1,
+                "01-07",
+                12,
+                "",
+                0,
+                0
+        );
+
+        when(historyService.getWeeklyHistory(projectName))
+                .thenReturn(List.of(currentPeriod));
+
+        DashboardPtdResponseDto result =
+                calculationService.calculateProjectPtdByPeriod(
+                        projectName,
+                        "Jan 2026",
+                        1
+                );
+
+        assertEquals(12, result.getFreshCases());
+        assertEquals(12, result.getAssignedWeekly());
+        assertEquals(0, result.getCarryForwardedCases());
+        assertEquals(12, result.getAssignedPtd());
+    }
+
+    @Test
+    void shouldStopAssignedPtdAtSelectedReportingPeriod() {
+
+        String projectName = "Period Cutoff Project";
+
+        Project periodOne = project(
+                projectName,
+                "Jan 2026",
+                LocalDate.of(2026, 1, 1),
+                1,
+                "01-07",
+                10,
+                "02 Jan 2026",
+                0,
+                0
+        );
+
+        Project periodTwo = project(
+                projectName,
+                "Jan 2026",
+                LocalDate.of(2026, 1, 1),
+                2,
+                "08-14",
+                20,
+                "09 Jan 2026",
+                0,
+                0
+        );
+
+        Project futurePeriod = project(
+                projectName,
+                "Jan 2026",
+                LocalDate.of(2026, 1, 1),
+                3,
+                "15-21",
+                300,
+                "16 Jan 2026",
+                0,
+                0
+        );
+
+        when(historyService.getWeeklyHistory(projectName))
+                .thenReturn(List.of(periodOne, periodTwo, futurePeriod));
+
+        DashboardPtdResponseDto result =
+                calculationService.calculateProjectPtdByPeriod(
+                        projectName,
+                        "Jan 2026",
+                        2
+                );
+
+        assertEquals(30, result.getAssignedPtd());
+    }
+
+    @Test
+    void shouldAccumulateSubmittedPtdThroughSelectedPeriodAndTreatNullAsZero() {
+
+        String projectName = "Submitted Period Project";
+
+        Project periodOne = project(
+                projectName,
+                "Jan 2026",
+                LocalDate.of(2026, 1, 1),
+                1,
+                "01-07",
+                0,
+                null,
+                4,
+                0
+        );
+
+        Project periodTwo = project(
+                projectName,
+                "Jan 2026",
+                LocalDate.of(2026, 1, 1),
+                2,
+                "08-14",
+                0,
+                null,
+                null,
+                0
+        );
+
+        Project futurePeriod = project(
+                projectName,
+                "Jan 2026",
+                LocalDate.of(2026, 1, 1),
+                3,
+                "15-21",
+                0,
+                null,
+                99,
+                0
+        );
+
+        when(historyService.getWeeklyHistory(projectName))
+                .thenReturn(List.of(periodOne, periodTwo, futurePeriod));
+
+        DashboardPtdResponseDto result =
+                calculationService.calculateProjectPtdByPeriod(
+                        projectName,
+                        "Jan 2026",
+                        2
+                );
+
+        assertEquals(0, result.getSubmittedWeekly());
+        assertEquals(4, result.getSubmittedPtd());
+    }
+
+    @Test
+    void shouldCalculateIssuePtdThroughPeriodFiveWithoutCountingPeriodZero() {
+
+        String projectName = "Period Five Project";
+
+        Project decemberPeriodFive = project(
+                projectName,
+                "Dec 2025",
+                LocalDate.of(2025, 12, 1),
+                5,
+                "22-31",
+                null,
+                null,
+                null,
+                3
+        );
+
+        Project januaryPeriodZero = project(
+                projectName,
+                "Jan 2026",
+                LocalDate.of(2026, 1, 1),
+                0,
+                "",
+                null,
+                null,
+                null,
+                3
+        );
+
+        Project januaryPeriodOne = project(
+                projectName,
+                "Jan 2026",
+                LocalDate.of(2026, 1, 1),
+                1,
+                "01-07",
+                null,
+                null,
+                null,
+                2
+        );
+
+        Project januaryPeriodFive = project(
+                projectName,
+                "Jan 2026",
+                LocalDate.of(2026, 1, 1),
+                5,
+                "22-31",
+                null,
+                null,
+                null,
+                5
+        );
+
+        when(historyService.getWeeklyHistory(projectName))
+                .thenReturn(List.of(
+                        decemberPeriodFive,
+                        januaryPeriodZero,
+                        januaryPeriodOne,
+                        januaryPeriodFive
+                ));
+
+        DashboardPtdResponseDto result =
+                calculationService.calculateProjectPtdByPeriod(
+                        projectName,
+                        "Jan 2026",
+                        5
+                );
+
+        assertEquals(5, result.getIssueWeekly());
+        assertEquals(10, result.getIssuePtd());
+    }
+
+    @Test
+    void shouldTreatNullNumericValuesAsZero() {
+
+        String projectName = "Null Numeric Project";
+
+        Project currentPeriod = project(
+                projectName,
+                "Jan 2026",
+                LocalDate.of(2026, 1, 1),
+                1,
+                "01-07",
+                null,
+                null,
+                null,
+                null
+        );
+
+        Project futurePeriod = project(
+                projectName,
+                "Jan 2026",
+                LocalDate.of(2026, 1, 1),
+                2,
+                "08-14",
+                400,
+                "09 Jan 2026",
+                500,
+                600
+        );
+
+        when(historyService.getWeeklyHistory(projectName))
+                .thenReturn(List.of(currentPeriod, futurePeriod));
+
+        DashboardPtdResponseDto result =
+                calculationService.calculateProjectPtdByPeriod(
+                        projectName,
+                        "Jan 2026",
+                        1
+                );
+
+        assertEquals(0, result.getAssignedWeekly());
+        assertEquals(0, result.getAssignedPtd());
+        assertEquals(0, result.getSubmittedWeekly());
+        assertEquals(0, result.getSubmittedPtd());
+        assertEquals(0, result.getIssueWeekly());
+        assertEquals(0, result.getIssuePtd());
+    }
+
     private Project project(
             String projectName,
             String reportingMonth,
