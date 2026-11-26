@@ -20,7 +20,8 @@ class SheetEnhancementMapperTest {
 
     @Test
     void mapsBothHeaderVariantsAndPreservesColumnZAndExistingGroundTruth() {
-        for (String header : List.of("Annotations Completed (GT+Rapid Review)", "Ground Truth")) {
+        for (String header : List.of("Annotations Completed (GT+Rapid Review)",
+                "Annotations Completed (GT + Rapid Review)", "Ground Truth", "Ground Truth Cases")) {
             for (String value : List.of("878", "4099", "0", "")) {
                 GoogleSheetRowDto row = rowMapper.mapRow(List.of(value, "43", "17"),
                         columns.buildColumnIndexMap(List.of(header,
@@ -32,6 +33,15 @@ class SheetEnhancementMapperTest {
                 assertEquals(17, project.getCasesInGroundTruth());
             }
         }
+    }
+
+    @Test
+    void groundTruthCasesIsDistinctFromCasesInGroundTruth() {
+        var headers = columns.buildColumnIndexMap(List.of("  GROUND\nTRUTH   CASES  ", "Cases in Ground Truth"));
+        GoogleSheetRowDto row = rowMapper.mapRow(List.of("4099", "23"), headers);
+        Project project = projectMapper.toEntity(row);
+        assertEquals(4099, project.getAnnotationsCompleted());
+        assertEquals(23, project.getCasesInGroundTruth());
     }
 
     @Test

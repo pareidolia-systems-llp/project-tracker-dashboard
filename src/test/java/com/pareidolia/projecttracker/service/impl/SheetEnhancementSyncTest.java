@@ -73,11 +73,10 @@ class SheetEnhancementSyncTest {
 
     @Test
     void oldAndNewHeadersKeepContinuationPeriodsAndAcceptedPtd() throws Exception {
-        List<GoogleSheetRowDto> oldRows = parse("Jan2026", fixture(OLD, 27));
-        List<GoogleSheetRowDto> newRows = parse("Jan2026", fixture("Ground Truth", 27));
-        assertEquals(2, oldRows.size());
-        assertEquals(2, newRows.size());
-        for (List<GoogleSheetRowDto> rows : List.of(oldRows, newRows)) {
+        for (String alias : List.of(OLD, "Annotations Completed (GT + Rapid Review)",
+                "Ground Truth", "Ground Truth Cases")) {
+            List<GoogleSheetRowDto> rows = parse("Jan2026", fixture(alias, 27));
+            assertEquals(2, rows.size());
             assertEquals("Project A", rows.get(1).getProjectName());
             assertEquals(1, rows.get(0).getReportingPeriod());
             assertEquals(2, rows.get(1).getReportingPeriod());
@@ -133,7 +132,8 @@ class SheetEnhancementSyncTest {
 
     @Test
     void zeroAndBlankRetainAcceptedPtdBehaviorForBothAliases() throws Exception {
-        for (String alias : List.of(OLD, "Ground Truth")) {
+        for (String alias : List.of(OLD, "Annotations Completed (GT + Rapid Review)",
+                "Ground Truth", "Ground Truth Cases")) {
             for (String value : List.of("0", "")) {
                 List<List<Object>> data = fixture(alias, -1);
                 data.get(3).set(24, value);
@@ -198,6 +198,19 @@ class SheetEnhancementSyncTest {
         List<List<Object>> duplicates = new ArrayList<>(fixture("Ground Truth", -1));
         duplicates.get(1).set(27, " ground   truth ");
         assertThrows(IllegalStateException.class, () -> parse("Jan2026", duplicates));
+    }
+
+    @Test
+    void rejectsEveryPairAndDuplicateOfAnnotationHeaderAliases() throws Exception {
+        List<String> aliases = List.of(OLD, "Annotations Completed (GT + Rapid Review)",
+                "Ground Truth", "Ground Truth Cases");
+        for (int i = 0; i < aliases.size(); i++) {
+            for (int j = i; j < aliases.size(); j++) {
+                List<List<Object>> data = new ArrayList<>(fixture(aliases.get(i), -1));
+                data.get(1).set(27, "  " + aliases.get(j).toUpperCase(java.util.Locale.ROOT) + "  ");
+                assertThrows(IllegalStateException.class, () -> parse("Jan2026", data));
+            }
+        }
     }
 
     @Test

@@ -1020,7 +1020,9 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
         for (Object header : headers) {
             String normalized = normalize(header == null ? null : header.toString());
             if (normalized.equals(normalize(ANNOTATIONS_COMPLETED))
-                    || normalized.equals(normalize(GROUND_TRUTH))) {
+                    || normalized.equals(normalize(ANNOTATIONS_COMPLETED_SPACED))
+                    || normalized.equals(normalize(GROUND_TRUTH))
+                    || normalized.equals(normalize(GROUND_TRUTH_CASES))) {
                 aliases++;
             }
             if (normalized.equals(normalize(PROJECT_INSTRUCTION))) {

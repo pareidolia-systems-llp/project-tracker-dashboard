@@ -153,8 +153,12 @@ public class GoogleSheetRowMapper {
                 safeGet(
                         row,
                         columnIndexMap,
-                        columnIndexMap.containsKey(normalize(GROUND_TRUTH))
-                                ? GROUND_TRUTH : ANNOTATIONS_COMPLETED
+                        columnIndexMap.containsKey(normalize(GROUND_TRUTH_CASES))
+                                ? GROUND_TRUTH_CASES
+                                : columnIndexMap.containsKey(normalize(GROUND_TRUTH))
+                                ? GROUND_TRUTH
+                                : columnIndexMap.containsKey(normalize(ANNOTATIONS_COMPLETED_SPACED))
+                                ? ANNOTATIONS_COMPLETED_SPACED : ANNOTATIONS_COMPLETED
                 )
         );
 
