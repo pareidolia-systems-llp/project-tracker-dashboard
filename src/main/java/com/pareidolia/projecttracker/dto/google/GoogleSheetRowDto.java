@@ -85,6 +85,8 @@ public class GoogleSheetRowDto {
 
     private String annotationsCompleted;
 
+    private String projectInstruction;
+
     private String pendingAnnotations;
 
 
