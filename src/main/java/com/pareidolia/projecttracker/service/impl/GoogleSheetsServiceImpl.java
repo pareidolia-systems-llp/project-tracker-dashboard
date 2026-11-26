@@ -490,8 +490,6 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
             String sheetName)
             throws IOException {
 
-        String endColumn = "AA";
-
         /*
          * Feb2025 is an older sheet and does not extend to column AA.
          * Reading A2:AA causes Google Sheets API INVALID_ARGUMENT.
@@ -504,11 +502,13 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                         )
                         .trim();
 
-        if ("Feb2025".equalsIgnoreCase(normalizedSheetName)) {
-            endColumn = "Z";
-        }
+        boolean feb2025 = "Feb2025".equalsIgnoreCase(normalizedSheetName);
+        int originalColumnCount = feb2025 ? 26 : 27;
+        String escapedSheetName = sheetName.replace("'", "''");
+        // A whole-tab read captures a dynamically placed instruction in the
+        // same response as the project data. Feb2025 keeps its original range.
         String sheetRange =
-                "'" + sheetName + "'!A2:" + endColumn;
+                "'" + escapedSheetName + "'" + (feb2025 ? "!A2:Z" : "");
         ValueRange response =
                 executeWithRetry(
                         () ->
@@ -522,19 +522,50 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
                         "Read sheet " + sheetName
                 );
 
-        List<List<Object>> rows =
+        List<List<Object>> readRows =
                 response.getValues();
 
-        if (rows == null || rows.isEmpty()) {
+        if (readRows == null || readRows.isEmpty() || (!feb2025 && readRows.size() < 2)) {
             return Collections.emptyList();
         }
 
-        List<Object> headerRow = rows.get(0);
+        List<List<Object>> fullRows = feb2025 ? readRows : readRows.subList(1, readRows.size());
+        List<Object> headerRow = fullRows.get(0);
+        validateAnnotationHeaders(headerRow, sheetName);
+        Map<String, Integer> fullHeaderMap = columnIndexMapper.buildColumnIndexMap(headerRow);
+        Integer instructionIndex = fullHeaderMap.get(normalize(PROJECT_INSTRUCTION));
+
+        // Retain the original A:AA / A:Z row view for all project and spacer
+        // detection, including look-ahead helpers. Extra cells cannot create
+        // rows or change project ownership and reporting periods.
+        List<List<Object>> rows = new ArrayList<>();
+        for (int rowIndex = 0; rowIndex < fullRows.size(); rowIndex++) {
+            List<Object> fullRow = fullRows.get(rowIndex);
+            List<Object> originalRow = new ArrayList<>(
+                    fullRow.subList(0, Math.min(originalColumnCount, fullRow.size())));
+            if (rowIndex > 0 && instructionIndex != null && instructionIndex < originalRow.size()) {
+                originalRow.set(instructionIndex, "");
+            }
+            while (!originalRow.isEmpty()) {
+                Object last = originalRow.get(originalRow.size() - 1);
+                if (last != null && !last.toString().isEmpty()) {
+                    break;
+                }
+                originalRow.remove(originalRow.size() - 1);
+            }
+            rows.add(originalRow);
+        }
+        while (rows.size() > 1 && rows.get(rows.size() - 1).isEmpty()) {
+            rows.remove(rows.size() - 1);
+        }
 
         Map<String, Integer> columnIndexMap =
                 columnIndexMapper.buildColumnIndexMap(
-                        headerRow
+                        rows.get(0)
                 );
+        if (instructionIndex != null) {
+            columnIndexMap.put(normalize(PROJECT_INSTRUCTION), instructionIndex);
+        }
 
 
 
@@ -582,7 +613,7 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
              */
             GoogleSheetRowDto dto =
                     mapper.mapRow(
-                            row,
+                            fullRows.get(i),
                             columnIndexMap
                     );
 
@@ -981,6 +1012,29 @@ public class GoogleSheetsServiceImpl implements GoogleSheetsService {
         }
 
         return dtoList;
+    }
+
+    private void validateAnnotationHeaders(List<Object> headers, String sheetName) {
+        int aliases = 0;
+        int instructionHeaders = 0;
+        for (Object header : headers) {
+            String normalized = normalize(header == null ? null : header.toString());
+            if (normalized.equals(normalize(ANNOTATIONS_COMPLETED))
+                    || normalized.equals(normalize(GROUND_TRUTH))) {
+                aliases++;
+            }
+            if (normalized.equals(normalize(PROJECT_INSTRUCTION))) {
+                instructionHeaders++;
+            }
+        }
+        if (aliases > 1) {
+            throw new IllegalStateException("Conflicting or duplicate annotations completed headers"
+                    + " | Sheet=[" + sheetName + "]");
+        }
+        if (instructionHeaders > 1) {
+            throw new IllegalStateException("Duplicate Project Instruction headers"
+                    + " | Sheet=[" + sheetName + "]");
+        }
     }
 
     private String normalize(String header) {

@@ -32,6 +32,8 @@ public final class SheetColumns {
     public static final String ETD = "ETD";
     public static final String ANNOTATIONS_COMPLETED =
             "Annotations Completed (GT+Rapid Review)";
+    public static final String GROUND_TRUTH = "Ground Truth";
+    public static final String PROJECT_INSTRUCTION = "Project Instruction";
     public static final String PENDING_ANNOTATIONS = "Pending Annotations + Cases Moved to Labels + Not Assigned Cases";
     public static final String NOTES = "Notes";
 }

@@ -94,6 +94,9 @@ public class Project {
 
     private Integer annotationsCompleted;
 
+    @Column(name = "project_instruction", length = 2048)
+    private String projectInstruction;
+
     private Integer pendingAnnotations;
 
     /* ==========================

@@ -1,14 +1,18 @@
 package com.pareidolia.projecttracker.mapper;
 
 import com.pareidolia.projecttracker.dto.google.GoogleSheetRowDto;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
 
 import static com.pareidolia.projecttracker.constants.SheetColumns.*;
 
 @Component
+@Slf4j
 public class GoogleSheetRowMapper {
 
     public GoogleSheetRowDto mapRow(
@@ -149,8 +153,13 @@ public class GoogleSheetRowMapper {
                 safeGet(
                         row,
                         columnIndexMap,
-                        ANNOTATIONS_COMPLETED
+                        columnIndexMap.containsKey(normalize(GROUND_TRUTH))
+                                ? GROUND_TRUTH : ANNOTATIONS_COMPLETED
                 )
+        );
+
+        dto.setProjectInstruction(
+                validateProjectInstruction(safeGet(row, columnIndexMap, PROJECT_INSTRUCTION))
         );
 
         dto.setPendingAnnotations(
@@ -166,6 +175,37 @@ public class GoogleSheetRowMapper {
         );
 
         return dto;
+    }
+
+    private String validateProjectInstruction(String value) {
+        if (value.isBlank()) {
+            return null;
+        }
+
+        if (value.length() > 2048) {
+            return invalidProjectInstruction();
+        }
+
+        try {
+            URI uri = new URI(value);
+            String host = uri.getHost();
+            if (!"https".equalsIgnoreCase(uri.getScheme())
+                    || host == null
+                    || !(host.equalsIgnoreCase("drive.google.com")
+                         || host.equalsIgnoreCase("docs.google.com"))
+                    || uri.getUserInfo() != null
+                    || (uri.getPort() != -1 && uri.getPort() != 443)) {
+                return invalidProjectInstruction();
+            }
+            return value;
+        } catch (URISyntaxException ex) {
+            return invalidProjectInstruction();
+        }
+    }
+
+    private String invalidProjectInstruction() {
+        log.warn("Project Instruction ignored: invalid, unsupported, or overlength URL.");
+        return null;
     }
 
     private String safeGet(

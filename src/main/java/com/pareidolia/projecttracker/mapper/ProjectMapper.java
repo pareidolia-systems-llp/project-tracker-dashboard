@@ -115,6 +115,8 @@ public class ProjectMapper {
                 parseInteger(dto.getAnnotationsCompleted())
         );
 
+        project.setProjectInstruction(dto.getProjectInstruction());
+
         project.setPendingAnnotations(
                 parseInteger(dto.getPendingAnnotations())
         );
